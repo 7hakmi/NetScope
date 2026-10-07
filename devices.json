@@ -1,12 +1,4 @@
 [
-    {
-        "name": "Google DNS",
-        "ip": "8.8.8.8",
-        "removable": false
-    },
-    {
-        "name": "Cloudflare DNS",
-        "ip": "1.1.1.1",
-        "removable": false
-    }
+  {"name": "Google DNS", "ip": "8.8.8.8"},
+  {"name": "Cloudflare DNS", "ip": "1.1.1.1"}
 ]

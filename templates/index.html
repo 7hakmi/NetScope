@@ -1,0 +1,3337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NetScope Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js">
+loadThresholds();
+</script>
+<style>
+:root{
+    --bg:#060b14;--sidebar:#08101d;--panel:#0d1726;--panel2:#101d2e;
+    --border:#1c2d42;--text:#e7eef8;--muted:#6f8198;--blue:#38bdf8;
+    --blue2:#0ea5e9;--green:#22c55e;--red:#ef4444;--yellow:#f59e0b;
+    --purple:#8b5cf6;--shadow:0 18px 45px rgba(0,0,0,.25)
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+button,input{font:inherit}
+.app{display:flex;min-height:100vh}
+.sidebar{
+    position:fixed;left:0;top:0;bottom:0;width:240px;background:linear-gradient(180deg,#08111f,#070d17);
+    border-right:1px solid var(--border);padding:22px 16px;display:flex;flex-direction:column;z-index:50
+}
+.brand{display:flex;align-items:center;gap:12px;padding:4px 8px 26px}
+.brand-logo{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-weight:800;
+    background:linear-gradient(135deg,#0284c7,#7c3aed);box-shadow:0 0 25px rgba(14,165,233,.25)}
+.brand h1{font-size:16px;letter-spacing:.6px}.brand p{font-size:10px;color:var(--muted);margin-top:2px}
+.nav-label{font-size:10px;color:#44566e;text-transform:uppercase;letter-spacing:1.2px;padding:0 12px 9px}
+.nav{display:flex;flex-direction:column;gap:5px}
+.nav-btn{
+    width:100%;border:0;background:transparent;color:#8393a8;padding:11px 12px;border-radius:9px;
+    text-align:left;cursor:pointer;display:flex;align-items:center;gap:11px;font-size:13px
+}
+.nav-btn:hover{background:#0d1a2a;color:#d9e6f5}.nav-btn.active{
+    color:#eaf8ff;background:linear-gradient(90deg,rgba(14,165,233,.18),rgba(14,165,233,.04));
+    box-shadow:inset 3px 0 0 var(--blue)
+}
+.nav-icon{width:19px;text-align:center;font-size:15px}
+.sidebar-bottom{margin-top:auto;border-top:1px solid var(--border);padding-top:15px}
+.monitor-state{display:flex;align-items:center;gap:9px;padding:9px 11px;color:#9fb0c4;font-size:11px}
+.live-dot{width:8px;height:8px;background:var(--green);border-radius:50%;box-shadow:0 0 12px var(--green);animation:pulse 1.8s infinite}
+@keyframes pulse{50%{opacity:.45}}
+.main{margin-left:240px;width:calc(100% - 240px);min-height:100vh}
+.topbar{
+    height:72px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;
+    border-bottom:1px solid var(--border);background:rgba(6,11,20,.88);backdrop-filter:blur(12px);
+    position:sticky;top:0;z-index:40
+}
+.top-title h2{font-size:18px}.top-title p{font-size:11px;color:var(--muted);margin-top:4px}
+.top-actions{display:flex;align-items:center;gap:10px}
+.clock{font-family:Consolas,monospace;color:#8293a8;font-size:11px;border:1px solid var(--border);padding:9px 11px;border-radius:8px}
+.primary-btn,.secondary-btn,.danger-btn,.small-btn{
+    border-radius:8px;padding:9px 13px;cursor:pointer;font-weight:600;font-size:11px;transition:.2s
+}
+.primary-btn{border:1px solid #0ea5e9;background:linear-gradient(135deg,#0369a1,#075985);color:#e0f2fe}
+.primary-btn:hover{filter:brightness(1.15)}
+.secondary-btn{border:1px solid #31445c;background:#0c1726;color:#9eb0c4}
+.secondary-btn:hover{border-color:#4a627f;color:white}
+.danger-btn{border:1px solid #7f1d1d;background:rgba(127,29,29,.18);color:#f87171}
+.small-btn{padding:6px 9px;border:1px solid #1d78a7;background:#0a2b42;color:#7dd3fc}
+.content{padding:25px 28px 35px;max-width:1700px;margin:auto}
+.page{display:none}.page.active{display:block}
+.page-head{display:flex;justify-content:space-between;align-items:end;margin-bottom:20px}
+.page-head h2{font-size:24px}.page-head p{font-size:12px;color:var(--muted);margin-top:6px}
+.kpis{display:grid;grid-template-columns:1.2fr repeat(4,1fr);gap:14px;margin-bottom:18px}
+.kpi{
+    position:relative;overflow:hidden;background:linear-gradient(145deg,#0e1929,#0a1422);border:1px solid var(--border);
+    border-radius:14px;padding:18px;min-height:115px;box-shadow:var(--shadow)
+}
+.kpi:after{content:"";position:absolute;width:90px;height:90px;border-radius:50%;right:-35px;top:-35px;background:rgba(56,189,248,.05)}
+.kpi-label{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.kpi-value{font-size:29px;font-weight:750;margin-top:12px}
+.kpi-sub{font-size:10px;color:#52647b;margin-top:7px}
+.health-card{background:linear-gradient(145deg,#0c1b2b,#0b1725)}
+.health-row{display:flex;align-items:center;gap:15px;margin-top:10px}
+.health-ring{width:60px;height:60px;border-radius:50%;display:grid;place-items:center;
+    background:conic-gradient(var(--green) 0deg, var(--green) 360deg,#17263a 360deg);position:relative}
+.health-ring:before{content:"";position:absolute;inset:6px;border-radius:50%;background:#0c1827}
+.health-ring span{position:relative;font-size:13px;font-weight:700}
+.grid-2{display:grid;grid-template-columns:1.45fr 1fr;gap:16px;margin-bottom:18px}
+.grid-equal{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
+.panel{background:linear-gradient(145deg,#0d1726,#0a1421);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.panel-head{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-bottom:1px solid var(--border)}
+.panel-head h3{font-size:13px}.panel-head p{font-size:10px;color:var(--muted);margin-top:3px}
+.panel-body{padding:17px}
+.chart-wrap{height:260px}
+.resource-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.resource{
+    background:#0a1421;border:1px solid #18283b;border-radius:12px;padding:16px
+}
+.resource-top{display:flex;justify-content:space-between;align-items:center}
+.resource-name{font-size:11px;color:#8da0b7}.resource-value{font-size:22px;font-weight:700;margin-top:12px}
+.progress{height:6px;background:#17263a;border-radius:10px;margin-top:13px;overflow:hidden}
+.progress span{display:block;height:100%;border-radius:10px;background:linear-gradient(90deg,#0284c7,#38bdf8)}
+.progress.ram span{background:linear-gradient(90deg,#6d28d9,#a78bfa)}
+.system-meta{margin-top:14px;display:grid;gap:8px}
+.meta-row{display:flex;justify-content:space-between;font-size:11px;border-bottom:1px dashed #17263a;padding-bottom:8px}
+.meta-row span:first-child{color:#61738a}
+.table-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:900px}
+th{text-align:left;color:#52647a;font-size:9px;text-transform:uppercase;letter-spacing:.65px;padding:11px 14px;background:#09131f;white-space:nowrap}
+td{padding:13px 14px;border-top:1px solid #17263a;font-size:11px;color:#aebed0;white-space:nowrap}
+tbody tr:hover{background:#0f1d2d}
+.device-name{font-weight:650;color:#e5edf7}.mono{font-family:Consolas,monospace;color:#8294aa}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:20px;font-size:9px;font-weight:700}
+.badge:before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+.online{color:#4ade80;background:rgba(34,197,94,.09)}
+.offline{color:#f87171;background:rgba(239,68,68,.09)}
+.warning{color:#fbbf24}.critical{color:#fb7185}.healthy{color:#4ade80}.muted{color:#52647a}
+.actions{display:flex;gap:6px}
+.events-mini{display:grid}
+.event-row{display:grid;grid-template-columns:82px 150px 1fr 130px;gap:12px;align-items:center;padding:13px 16px;border-top:1px solid #17263a;font-size:10px}
+.severity{width:max-content;padding:4px 7px;border-radius:20px;text-transform:uppercase;font-size:8px;font-weight:800}
+.sev-success{color:#4ade80;background:rgba(34,197,94,.1)}
+.sev-critical{color:#fb7185;background:rgba(239,68,68,.1)}
+.sev-warning{color:#fbbf24;background:rgba(245,158,11,.1)}
+.sev-info{color:#38bdf8;background:rgba(56,189,248,.1)}
+.event-title{font-weight:650;color:#dce7f4}.event-message{color:#778ba3}.event-time{text-align:right;color:#52647a;font-family:Consolas,monospace}
+.empty{padding:30px;text-align:center;color:#52647a;font-size:11px}
+.device-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.device-card{background:linear-gradient(145deg,#0e1929,#0a1421);border:1px solid var(--border);border-radius:13px;padding:17px}
+.device-card-head{display:flex;justify-content:space-between;gap:10px}
+.device-card h3{font-size:13px}.device-card .ipline{font:10px Consolas;color:#60738b;margin-top:5px}
+.device-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:15px}
+.mini-stat{background:#09131f;border:1px solid #17263a;border-radius:8px;padding:10px}
+.mini-stat label{display:block;color:#52647a;font-size:8px;text-transform:uppercase}.mini-stat strong{display:block;margin-top:6px;font-size:12px}
+.searchbar{display:flex;gap:10px}
+.searchbar input{width:260px;background:#09131f;border:1px solid var(--border);color:white;border-radius:8px;padding:9px 12px;outline:none;font-size:11px}
+.discovery-status{padding:16px 18px;color:#667b94;font-size:11px}
+.analytics-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
+.analytics-card{background:#0d1726;border:1px solid var(--border);border-radius:13px;padding:17px}
+.analytics-card label{font-size:9px;color:#5d7189;text-transform:uppercase}.analytics-card strong{display:block;font-size:23px;margin-top:9px}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;align-items:center;justify-content:center;padding:20px}
+.modal-overlay.show{display:flex}
+.modal{width:min(850px,100%);max-height:90vh;overflow:auto;background:#0b1523;border:1px solid #29405a;border-radius:15px;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.modal-head{display:flex;justify-content:space-between;padding:19px 21px;border-bottom:1px solid var(--border)}
+.modal-head h3{font-size:16px}.modal-head p{font:11px Consolas;color:#63778f;margin-top:4px}
+.close{border:0;background:none;color:#7d90a8;font-size:24px;cursor:pointer}
+.modal-body{padding:20px}
+.modal-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.modal-stat{background:#08121e;border:1px solid #17283b;border-radius:9px;padding:13px}
+.modal-stat label{font-size:8px;color:#53677f;text-transform:uppercase}.modal-stat strong{display:block;margin-top:6px;font-size:17px}
+.toast{position:fixed;right:25px;bottom:25px;background:#101d2e;border:1px solid #2b4059;color:#dce8f5;padding:12px 16px;border-radius:9px;z-index:200;display:none;font-size:11px}
+.toast.show{display:block}
+@media(max-width:1200px){.kpis{grid-template-columns:repeat(2,1fr)}.grid-2,.grid-equal{grid-template-columns:1fr}.device-cards{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:800px){.sidebar{width:70px;padding:18px 9px}.brand-text,.nav-btn span:last-child,.nav-label,.sidebar-bottom span:last-child{display:none}.brand{padding-left:7px}.main{margin-left:70px;width:calc(100% - 70px)}.nav-btn{justify-content:center}.content{padding:18px}.topbar{padding:0 18px}.clock{display:none}.kpis{grid-template-columns:1fr}.device-cards{grid-template-columns:1fr}.resource-grid{grid-template-columns:1fr}.modal-stats{grid-template-columns:repeat(2,1fr)}}
+
+.topology-shell{position:relative;min-height:680px;background:
+radial-gradient(circle at center,rgba(14,165,233,.08),transparent 34%),
+linear-gradient(rgba(28,45,66,.18) 1px,transparent 1px),
+linear-gradient(90deg,rgba(28,45,66,.18) 1px,transparent 1px);
+background-size:auto,32px 32px,32px 32px;overflow:hidden}
+.topology-canvas{position:relative;min-height:680px}
+.topology-lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.topology-line{stroke:#23415d;stroke-width:1.4;stroke-dasharray:5 5}
+.topology-line.online-line{stroke:#17633a}.topology-line.offline-line{stroke:#6e2630}
+.topology-node{position:absolute;width:150px;transform:translate(-50%,-50%);background:#0b1726;border:1px solid #233a53;border-radius:12px;padding:13px;text-align:center;box-shadow:0 12px 30px rgba(0,0,0,.3);cursor:pointer;transition:.2s}
+.topology-node:hover{transform:translate(-50%,-50%) scale(1.04);border-color:#3b82a8}
+.topology-node.router{width:170px;border-color:#176b93;background:linear-gradient(145deg,#0c2234,#0a1725)}
+.topology-node.local{border-color:#5b3da1}
+.node-icon{width:38px;height:38px;margin:0 auto 9px;border-radius:10px;background:#12243a;display:grid;place-items:center;font-size:17px}
+.topology-node.online-node .node-icon{box-shadow:inset 0 0 0 1px rgba(34,197,94,.3)}
+.topology-node.offline-node .node-icon{box-shadow:inset 0 0 0 1px rgba(239,68,68,.4)}
+.node-name{font-size:11px;font-weight:700;color:#e5edf7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.node-ip{font:9px Consolas;color:#60778f;margin-top:4px}
+.node-state{font-size:8px;margin-top:7px;font-weight:800;text-transform:uppercase}
+.topology-legend{display:flex;gap:16px;color:#6c8098;font-size:9px}.legend-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px}
+@media(max-width:800px){.topology-shell,.topology-canvas{min-height:760px}.topology-node{width:125px}}
+
+.analytics-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.analytics-select{background:#09131f;border:1px solid var(--border);color:#dce8f5;border-radius:8px;padding:8px 11px;font-size:10px;outline:none}
+.analytics-note{font-size:9px;color:#52647a}
+.metric-good{color:#4ade80}.metric-warn{color:#fbbf24}.metric-bad{color:#fb7185}
+.analytics-wide{margin-bottom:16px}
+
+/* ===== NetScope LIGHT ENTERPRISE THEME ===== */
+:root{
+    --bg:#f4f7fb;
+    --sidebar:#ffffff;
+    --panel:#ffffff;
+    --panel2:#f8fafc;
+    --border:#dbe4ee;
+    --text:#172033;
+    --muted:#708096;
+    --blue:#2563eb;
+    --blue2:#3b82f6;
+    --green:#16a34a;
+    --red:#dc2626;
+    --yellow:#d97706;
+    --purple:#7c3aed;
+    --shadow:0 10px 30px rgba(30,64,175,.07);
+}
+body{background:#f4f7fb;color:#172033}
+.sidebar{
+    background:#ffffff;
+    border-right:1px solid #dbe4ee;
+    box-shadow:4px 0 18px rgba(15,23,42,.035);
+}
+.brand-logo{
+    background:linear-gradient(135deg,#2563eb,#60a5fa);
+    box-shadow:0 8px 20px rgba(37,99,235,.18);
+    color:white;
+}
+.brand h1{color:#172033}.brand p,.nav-label{color:#8a98aa}
+.nav-btn{color:#66758a}
+.nav-btn:hover{background:#f1f5f9;color:#1e3a5f}
+.nav-btn.active{
+    color:#1d4ed8;
+    background:#eff6ff;
+    box-shadow:inset 3px 0 0 #2563eb;
+}
+.sidebar-bottom{border-color:#e4ebf3}
+.monitor-state{color:#607086}
+.main{background:#f4f7fb}
+.topbar{
+    background:rgba(255,255,255,.92);
+    border-bottom:1px solid #dbe4ee;
+    box-shadow:0 4px 18px rgba(15,23,42,.035);
+}
+.top-title h2{color:#172033}.top-title p{color:#7b8a9d}
+.clock{color:#65758a;border-color:#dbe4ee;background:#f8fafc}
+.primary-btn{
+    border-color:#2563eb;
+    background:linear-gradient(135deg,#2563eb,#3b82f6);
+    color:white;
+}
+.secondary-btn{border-color:#d4deea;background:#fff;color:#52647a}
+.secondary-btn:hover{border-color:#9fb0c5;color:#172033;background:#f8fafc}
+.danger-btn{border-color:#fecaca;background:#fff5f5;color:#dc2626}
+.small-btn{border-color:#bfdbfe;background:#eff6ff;color:#2563eb}
+.kpi,.panel,.device-card,.analytics-card{
+    background:#ffffff;
+    border-color:#dbe4ee;
+    box-shadow:0 10px 28px rgba(15,23,42,.045);
+}
+.kpi:after{background:rgba(37,99,235,.045)}
+.health-card{background:linear-gradient(145deg,#ffffff,#f5f9ff)}
+.kpi-label,.kpi-sub,.panel-head p,.resource-name,.analytics-note{color:#7a899d}
+.kpi-value,.panel-head h3,.page-head h2,.device-card h3{color:#172033}
+.health-ring:before{background:#fff}
+.panel-head{border-color:#e3eaf2}
+.panel-body{background:#fff}
+.resource,.mini-stat,.modal-stat{
+    background:#f8fafc;
+    border-color:#e0e8f0;
+}
+.resource-value,.mini-stat strong,.modal-stat strong{color:#172033}
+.progress{background:#e5ebf2}
+.progress span{background:linear-gradient(90deg,#2563eb,#60a5fa)}
+.progress.ram span{background:linear-gradient(90deg,#7c3aed,#a78bfa)}
+.system-meta .meta-row{border-color:#e5ebf2}
+.meta-row span:first-child{color:#7a899d}
+table{background:#fff}
+th{background:#f8fafc;color:#7a899d;border-color:#e5ebf2}
+td{border-color:#e7edf4;color:#52647a}
+tbody tr:hover{background:#f8fbff}
+.device-name{color:#1f2937}.mono{color:#68798f}
+.online{color:#15803d;background:#ecfdf3}
+.offline{color:#dc2626;background:#fff1f2}
+.muted{color:#94a3b8}
+.event-row{border-color:#e7edf4}
+.event-title{color:#26354a}.event-message,.event-time{color:#74849a}
+.sev-success{color:#15803d;background:#ecfdf3}
+.sev-critical{color:#dc2626;background:#fff1f2}
+.sev-warning{color:#b45309;background:#fff7ed}
+.sev-info{color:#2563eb;background:#eff6ff}
+.searchbar input,.analytics-select{
+    background:#fff;border-color:#d4deea;color:#172033;
+    box-shadow:0 3px 10px rgba(15,23,42,.025);
+}
+.searchbar input::placeholder{color:#9aa8b9}
+.discovery-status{color:#68798f;background:#fbfcfe}
+.modal-overlay{background:rgba(15,23,42,.38);backdrop-filter:blur(4px)}
+.modal{background:#fff;border-color:#dbe4ee;box-shadow:0 30px 80px rgba(15,23,42,.18)}
+.modal-head{border-color:#e3eaf2}.modal-head h3{color:#172033}.modal-head p{color:#718197}
+.close{color:#738399}
+.toast{background:#172033;border-color:#26364d;color:white}
+.topology-shell{
+    background:
+    radial-gradient(circle at center,rgba(37,99,235,.07),transparent 34%),
+    linear-gradient(rgba(148,163,184,.13) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(148,163,184,.13) 1px,transparent 1px),
+    #f8fafc;
+    background-size:auto,32px 32px,32px 32px,auto;
+}
+.topology-line{stroke:#a9b8c8}.topology-line.online-line{stroke:#67b889}.topology-line.offline-line{stroke:#ef9a9a}
+.topology-node{
+    background:#ffffff;border-color:#d5e0eb;
+    box-shadow:0 10px 24px rgba(15,23,42,.09);
+}
+.topology-node:hover{border-color:#60a5fa}
+.topology-node.router{
+    border-color:#93c5fd;
+    background:linear-gradient(145deg,#ffffff,#eff6ff);
+}
+.topology-node.local{border-color:#c4b5fd}
+.node-icon{background:#f1f5f9;color:#2563eb}
+.node-name{color:#243247}.node-ip{color:#718197}
+.analytics-card label,.mini-stat label,.modal-stat label{color:#7b8b9e}
+.empty{color:#8796a8}
+
+
+/* ===== NetScope V10 — GRAPHITE + ORANGE ===== */
+html,body,.app,.main{
+    background:#353a40 !important;
+    color:#e7e9ec !important;
+}
+.content{background:#353a40 !important}
+
+.sidebar{
+    background:#3d434a !important;
+    border-color:#50575f !important;
+    box-shadow:4px 0 20px rgba(0,0,0,.12) !important;
+}
+.topbar{
+    background:rgba(61,67,74,.97) !important;
+    border-color:#50575f !important;
+    box-shadow:0 4px 18px rgba(0,0,0,.10) !important;
+}
+
+.kpi,.panel,.device-card,.analytics-card,.resource,.mini-stat,.modal-stat,.modal{
+    background:#454b52 !important;
+    color:#eceef0 !important;
+    border-color:#596169 !important;
+    box-shadow:0 8px 24px rgba(0,0,0,.11) !important;
+}
+.health-card,.panel-body,.panel-head{background:#454b52 !important}
+.panel-head{border-color:#596169 !important}
+
+h1,h2,h3,.device-name,.resource-value,.mini-stat strong,.modal-stat strong{
+    color:#f2f3f4 !important;
+}
+p,.kpi-label,.kpi-sub,.resource-name,.analytics-note,.event-message,.event-time,
+.ipline,.mono,.node-ip,.discovery-status{
+    color:#b4bac0 !important;
+}
+
+table,tbody{background:#454b52 !important}
+thead,th{background:#3e444a !important;color:#b9bec4 !important}
+td{background:#454b52 !important;color:#d4d7da !important;border-color:#575f66 !important}
+tbody tr:hover td{background:#4c535a !important}
+
+.searchbar input,.analytics-select,.clock,.secondary-btn{
+    background:#3c4248 !important;
+    color:#e5e7e9 !important;
+    border-color:#5a626a !important;
+}
+.searchbar input::placeholder{color:#92999f !important}
+
+.nav-label{color:#969da4 !important}
+.nav-btn{color:#c0c5ca !important}
+.nav-btn:hover{background:#474e55 !important;color:#ffffff !important}
+.nav-btn.active{
+    background:#51483f !important;
+    color:#ffb15c !important;
+    box-shadow:inset 3px 0 0 #35c7c2 !important;
+}
+
+.brand-logo{
+    background:linear-gradient(135deg,#df7415,#f59e42) !important;
+    color:#fff !important;
+    box-shadow:0 6px 18px rgba(53,199,194,.20) !important;
+}
+.primary-btn{
+    background:linear-gradient(135deg,#df7415,#35c7c2) !important;
+    border-color:#35c7c2 !important;
+    color:#fff !important;
+    box-shadow:none !important;
+}
+.primary-btn:hover{filter:brightness(1.08)}
+.small-btn{
+    background:#55493e !important;
+    border-color:#8a6543 !important;
+    color:#ffc27b !important;
+}
+.secondary-btn:hover{
+    background:#484f56 !important;
+    border-color:#747d85 !important;
+    color:#fff !important;
+}
+
+.progress{background:#343a40 !important}
+.progress span{background:linear-gradient(90deg,#df7415,#f5a14c) !important}
+.progress.ram span{background:linear-gradient(90deg,#737b84,#9aa1a8) !important}
+
+.topology-shell,.topology-canvas{background-color:#3b4147 !important}
+.topology-shell{
+    background:
+      radial-gradient(circle at center,rgba(53,199,194,.07),transparent 35%),
+      linear-gradient(rgba(150,158,166,.09) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(150,158,166,.09) 1px,transparent 1px),
+      #3b4147 !important;
+    background-size:auto,32px 32px,32px 32px,auto !important;
+}
+.topology-node{
+    background:#484f56 !important;
+    border-color:#626b73 !important;
+    box-shadow:0 9px 24px rgba(0,0,0,.16) !important;
+}
+.topology-node.router{
+    background:#51483f !important;
+    border-color:#b0733d !important;
+}
+.node-icon{
+    background:#393f45 !important;
+    color:#f2a04c !important;
+}
+.node-name{color:#f0f1f2 !important}
+.topology-line{stroke:#737b82 !important}
+.topology-line.online-line{stroke:#5b9c78 !important}
+.topology-line.offline-line{stroke:#a65f66 !important}
+
+.health-ring:before{background:#454b52 !important}
+.event-row,.meta-row{border-color:#575f66 !important}
+
+/* restrained status colors */
+.online,.sev-success{color:#91d3ae !important;background:#3e5b4c !important}
+.offline,.sev-critical{color:#f1a2aa !important;background:#65454a !important}
+.sev-warning{color:#ffc16d !important;background:#62513c !important}
+.sev-info{color:#a8c7df !important;background:#405565 !important}
+.danger-btn{
+    background:#604449 !important;
+    border-color:#85545b !important;
+    color:#f3a8af !important;
+}
+.toast{background:#292e33 !important;border-color:#606870 !important;color:#fff !important}
+
+/* Make charts fit the graphite UI better */
+
+
+/* ===== REPORTS & EXPORT ===== */
+.report-toolbar{display:flex;gap:9px;flex-wrap:wrap}
+.report-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+.report-card{background:#454b52;border:1px solid #596169;border-radius:13px;padding:17px;box-shadow:0 8px 24px rgba(0,0,0,.11)}
+.report-card label{display:block;color:#b4bac0;font-size:9px;text-transform:uppercase;letter-spacing:.7px}
+.report-card strong{display:block;color:#f2f3f4;font-size:23px;margin-top:9px}
+.report-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.report-meta div{background:#3e444a;border:1px solid #575f66;border-radius:9px;padding:12px}
+.report-meta label{display:block;font-size:8px;color:#aeb4ba;text-transform:uppercase}
+.report-meta span{display:block;margin-top:6px;font-size:11px;color:#eceef0}
+.report-note{margin-top:12px;color:#aeb4ba;font-size:10px;line-height:1.6}
+@media(max-width:1000px){.report-summary{grid-template-columns:repeat(2,1fr)}.report-meta{grid-template-columns:1fr}}
+@media(max-width:650px){.report-summary{grid-template-columns:1fr}}
+@media print{
+    body{background:white!important;color:#111!important}
+    .sidebar,.topbar,.page:not(#page-reports),#reportActions,.toast{display:none!important}
+    .main{margin:0!important;width:100%!important}
+    .content{padding:0!important;background:white!important}
+    #page-reports{display:block!important}
+    #page-reports .page-head button{display:none!important}
+    #page-reports .panel,#page-reports .report-card,#page-reports .report-meta div{
+        background:white!important;color:#111!important;border:1px solid #bbb!important;box-shadow:none!important
+    }
+    #page-reports h2,#page-reports h3,#page-reports strong,#page-reports span,#page-reports td,#page-reports th,
+    #page-reports label,#page-reports p{color:#111!important}
+    #page-reports th{background:#eee!important}
+    #page-reports td{background:white!important}
+}
+
+
+/* ===== SMART ALERT SETTINGS ===== */
+.settings-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:16px}
+.setting-card{background:#454b52;border:1px solid #596169;border-radius:13px;padding:18px}
+.setting-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:16px}
+.setting-head h3{font-size:13px;color:#f2f3f4}.setting-head p{font-size:10px;color:#b4bac0;margin-top:4px;line-height:1.5}
+.setting-value{font:700 19px Consolas;color:#ffb15c;white-space:nowrap}
+.setting-card input[type="range"]{width:100%;accent-color:#35c7c2}
+.setting-scale{display:flex;justify-content:space-between;color:#92999f;font-size:9px;margin-top:7px}
+.settings-actions{display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap}
+.threshold-status{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.threshold-chip{background:#3e444a;border:1px solid #575f66;border-radius:10px;padding:12px}
+.threshold-chip label{display:block;color:#aeb4ba;font-size:8px;text-transform:uppercase}
+.threshold-chip strong{display:block;color:#f2f3f4;font-size:14px;margin-top:6px}
+.toggle-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid #575f66}
+.toggle-row:first-child{border-top:0}
+.toggle-copy strong{display:block;font-size:11px;color:#eceef0}.toggle-copy span{display:block;font-size:9px;color:#aeb4ba;margin-top:3px}
+.switch{position:relative;width:42px;height:23px}
+.switch input{display:none}
+.switch span{position:absolute;inset:0;background:#343a40;border:1px solid #616970;border-radius:30px;cursor:pointer;transition:.2s}
+.switch span:before{content:"";position:absolute;width:17px;height:17px;left:2px;top:2px;border-radius:50%;background:#9aa1a8;transition:.2s}
+.switch input:checked + span{background:#76522f;border-color:#b2763d}
+.switch input:checked + span:before{transform:translateX(19px);background:#ffb15c}
+@media(max-width:1000px){.settings-grid{grid-template-columns:1fr}.threshold-status{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.threshold-status{grid-template-columns:1fr}}
+
+
+/* ===== ANALYTICS V2 ===== */
+.analytics-periods{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.analytics-period-btn.active{background:linear-gradient(135deg,#df7415,#35c7c2)!important;border-color:#35c7c2!important;color:#fff!important}
+.analytics-v2-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:16px}
+.analytics-v2-card{background:#454b52;border:1px solid #596169;border-radius:13px;padding:17px;box-shadow:0 8px 24px rgba(0,0,0,.11)}
+.analytics-v2-card label{display:block;color:#b4bac0;font-size:9px;text-transform:uppercase;letter-spacing:.65px}
+.analytics-v2-card strong{display:block;color:#f2f3f4;font-size:23px;margin-top:9px}
+.analytics-v2-card span{display:block;color:#9fa6ad;font-size:9px;margin-top:6px}
+@media(max-width:1200px){.analytics-v2-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:650px){.analytics-v2-grid{grid-template-columns:1fr}}
+
+
+/* ===== ANALYTICS V2 COMPACT WORKSPACE ===== */
+#page-analytics{max-width:1180px;margin:0 auto}
+#page-analytics .page-head{margin-bottom:14px;align-items:center}
+#page-analytics .page-head h2{font-size:20px}
+#page-analytics .analytics-v2-grid{grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:12px}
+#page-analytics .analytics-v2-card{padding:13px 14px;min-height:86px}
+#page-analytics .analytics-v2-card strong{font-size:20px;margin-top:6px}
+#page-analytics .analytics-v2-card span{margin-top:4px}
+#page-analytics .panel{border-radius:11px}
+#page-analytics .panel-head{padding:12px 14px}
+#page-analytics th{padding:9px 11px}
+#page-analytics td{padding:10px 11px}
+#page-analytics .analytics-device-row{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,.9fr);gap:12px;margin-top:12px;align-items:start}
+#page-analytics .analytics-history-panel{min-width:0}
+#page-analytics .analytics-history-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#page-analytics .analytics-history-toolbar .analytics-select{min-width:220px}
+#page-analytics .analytics-mini-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:12px 14px 0}
+#page-analytics .analytics-mini-stat{background:#3e444a;border:1px solid #575f66;border-radius:9px;padding:10px}
+#page-analytics .analytics-mini-stat label{display:block;color:#b4bac0;font-size:8px;text-transform:uppercase}
+#page-analytics .analytics-mini-stat strong{display:block;color:#f2f3f4;font-size:14px;margin-top:5px}
+#page-analytics .analytics-history-charts{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:12px 14px 14px}
+#page-analytics .analytics-history-charts .chart-wrap{height:185px}
+#page-analytics .analytics-session-panel .chart-wrap{height:210px}
+#page-analytics .analytics-session-panel .panel-body{padding:12px}
+#page-analytics .analytics-section-label{font-size:9px;color:#b4bac0;text-transform:uppercase;letter-spacing:.8px;margin:16px 0 8px}
+@media(max-width:1100px){
+  #page-analytics .analytics-v2-grid{grid-template-columns:repeat(3,1fr)}
+  #page-analytics .analytics-device-row{grid-template-columns:1fr}
+}
+@media(max-width:750px){
+  #page-analytics .analytics-v2-grid{grid-template-columns:repeat(2,1fr)}
+  #page-analytics .analytics-history-charts{grid-template-columns:1fr}
+}
+
+
+/* ===== ANALYTICS V3 — CIRCULAR CLEAN DASHBOARD ===== */
+#page-analytics{max-width:1180px;margin:0 auto}
+#page-analytics .page-head{margin-bottom:16px}
+.analytics-rings{
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:12px;
+    margin:12px 0 18px;
+}
+.analytics-ring-card{
+    background:#454b52;
+    border:1px solid #596169;
+    border-radius:14px;
+    padding:15px 10px 13px;
+    text-align:center;
+    min-width:0;
+}
+.analytics-ring{
+    --value:0;
+    --ring:#35c7c2;
+    width:104px;
+    height:104px;
+    margin:0 auto 10px;
+    border-radius:50%;
+    position:relative;
+    display:grid;
+    place-items:center;
+    background:conic-gradient(var(--ring) calc(var(--value)*1%),#596169 0);
+}
+.analytics-ring::before{
+    content:"";
+    position:absolute;
+    width:82px;
+    height:82px;
+    border-radius:50%;
+    background:#454b52;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.025);
+}
+.analytics-ring-value{
+    position:relative;
+    z-index:1;
+    font-size:18px;
+    font-weight:750;
+    color:#f4f5f6;
+    letter-spacing:-.4px;
+}
+.analytics-ring-card label{
+    display:block;
+    font-size:9px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.65px;
+    color:#c0c5ca;
+}
+.analytics-ring-card small{
+    display:block;
+    margin-top:5px;
+    font-size:8px;
+    color:#9299a0;
+}
+.analytics-v3-grid{
+    display:grid;
+    grid-template-columns:1.35fr .9fr;
+    gap:14px;
+    margin-bottom:14px;
+}
+.analytics-v3-chart{
+    height:245px;
+}
+.analytics-v3-chart .panel-body{
+    height:190px;
+    padding:8px 14px 14px;
+}
+.analytics-v3-chart .chart-wrap{
+    height:100%;
+}
+.analytics-device-list{
+    display:grid;
+    gap:8px;
+    padding:12px 14px 14px;
+}
+.analytics-device-health{
+    display:grid;
+    grid-template-columns:minmax(110px,1fr) 2fr auto;
+    gap:10px;
+    align-items:center;
+    background:#3e444a;
+    border:1px solid #555d64;
+    border-radius:9px;
+    padding:9px 10px;
+}
+.analytics-device-health-name{
+    min-width:0;
+    font-size:10px;
+    font-weight:650;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+.analytics-progress{
+    height:7px;
+    border-radius:999px;
+    background:#596169;
+    overflow:hidden;
+}
+.analytics-progress > span{
+    display:block;
+    height:100%;
+    border-radius:inherit;
+    background:#35c7c2;
+}
+.analytics-device-health strong{font-size:10px;min-width:45px;text-align:right}
+.analytics-v3-table th,.analytics-v3-table td{padding:9px 11px}
+.analytics-v3-table .device-name{font-size:10px}
+.analytics-v3-table .mono{font-size:8px}
+.analytics-problem-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #596169}
+.analytics-problem-row:last-child{border-bottom:0}
+.analytics-problem-main{min-width:0}
+.analytics-problem-main strong{display:block;font-size:10px}
+.analytics-problem-main span{display:block;font-size:8px;color:#aeb4ba;margin-top:3px}
+.analytics-problem-score{font-size:10px;font-weight:700;white-space:nowrap}
+@media(max-width:1050px){
+    .analytics-rings{grid-template-columns:repeat(3,1fr)}
+    .analytics-v3-grid{grid-template-columns:1fr}
+}
+@media(max-width:650px){
+    .analytics-rings{grid-template-columns:repeat(2,1fr)}
+    .analytics-ring{width:92px;height:92px}
+    .analytics-ring::before{width:72px;height:72px}
+}
+
+
+/* ===== NetScope V4 CLEAN UI ===== */
+.content{padding:22px 28px 30px}
+.page{max-width:1180px;margin:0 auto}
+.page-head{margin-bottom:16px}
+.panel{overflow:hidden}
+.table-wrap{max-width:100%;overflow-x:auto}
+#page-overview .summary-grid{gap:12px}
+#page-overview .summary-card{min-height:112px;padding:16px}
+#page-overview .overview-grid{gap:14px}
+#page-overview .chart-wrap{height:250px}
+#page-overview .snapshot-panel{min-height:0}
+#page-overview .incident-list{max-height:330px;overflow:auto}
+#page-overview .table-wrap{max-height:330px;overflow:auto}
+
+#page-topology .topology-stage{min-height:520px;max-height:610px}
+#page-topology .topology-node{transform:scale(.92)}
+#page-topology .panel-body{padding:12px}
+
+#page-reports .report-summary{gap:12px}
+#page-reports .report-card{padding:14px;min-height:88px}
+#page-reports .report-section{margin-top:14px}
+#page-reports .table-wrap{max-height:430px;overflow:auto}
+#page-reports .report-actions{gap:8px;flex-wrap:wrap}
+
+#page-alerts .panel{max-height:680px}
+#page-alerts .event-list,#page-alerts .events-list,#page-alerts .timeline{max-height:600px;overflow:auto}
+#page-alerts .table-wrap{max-height:600px;overflow:auto}
+
+/* Custom scrollbars */
+#page-alerts *::-webkit-scrollbar,#page-reports *::-webkit-scrollbar,#page-overview *::-webkit-scrollbar{width:7px;height:7px}
+#page-alerts *::-webkit-scrollbar-thumb,#page-reports *::-webkit-scrollbar-thumb,#page-overview *::-webkit-scrollbar-thumb{background:#687078;border-radius:99px}
+
+/* Circular overview KPI layer */
+.overview-v4-rings{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px}
+.overview-v4-card{background:#454b52;border:1px solid #596169;border-radius:14px;padding:14px;text-align:center}
+.overview-v4-ring{--value:0;--ring:#35c7c2;width:86px;height:86px;border-radius:50%;margin:0 auto 8px;display:grid;place-items:center;position:relative;background:conic-gradient(var(--ring) calc(var(--value)*1%),#596169 0)}
+.overview-v4-ring:before{content:"";position:absolute;width:68px;height:68px;border-radius:50%;background:#454b52}
+.overview-v4-ring strong{position:relative;z-index:1;font-size:16px}
+.overview-v4-card label{display:block;font-size:8px;letter-spacing:.7px;text-transform:uppercase;color:#b9c0c6;font-weight:700}
+.overview-v4-card small{display:block;font-size:8px;color:#929aa1;margin-top:4px}
+
+.v4-compact-table tbody tr:nth-child(n+7){display:none}
+.v4-more-note{padding:9px 14px;font-size:8px;color:#9da4aa;border-top:1px solid #596169}
+
+@media(max-width:1050px){
+ .overview-v4-rings{grid-template-columns:repeat(3,1fr)}
+}
+@media(max-width:700px){
+ .content{padding:16px}
+ .overview-v4-rings{grid-template-columns:repeat(2,1fr)}
+}
+
+
+/* ===== NetScope V5 — CLEAN OPERATIONS UI ===== */
+#page-overview,#page-topology,#page-alerts{max-width:1180px;margin:0 auto}
+.overview-head{align-items:center}
+.overview-live{display:inline-flex;align-items:center;gap:7px;font-size:8px;font-weight:800;letter-spacing:.7px;color:#9fd7b7;background:#3e5b4c;border:1px solid #52715f;padding:7px 10px;border-radius:999px}
+.overview-live i{width:6px;height:6px;border-radius:50%;background:#2ed06f;box-shadow:0 0 8px #2ed06f}
+
+.overview-v5-rings{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.overview-v5-card{background:#454b52;border:1px solid #596169;border-radius:16px;min-height:158px;padding:14px 10px 12px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.overview-v5-ring{width:82px;height:82px;border-radius:50%;display:grid;place-items:center;position:relative;background:conic-gradient(#22c55e 0deg,#22c55e 0deg,#596169 0deg);margin-bottom:8px}
+.overview-v5-ring:before{content:"";position:absolute;inset:9px;border-radius:50%;background:#454b52}
+.overview-v5-ring span{position:relative;z-index:1;font-size:16px;font-weight:800;color:#f5f5f5;white-space:nowrap}
+.overview-v5-ring.online-ring{background:conic-gradient(#22c55e 0 100%,#596169 0)}
+.overview-v5-ring.offline-ring{background:conic-gradient(#ef5968 0 100%,#596169 0)}
+.overview-v5-ring.alert-ring{background:conic-gradient(#f59e0b 0 100%,#596169 0)}
+.overview-v5-ring.latency-ring{background:conic-gradient(#35c7c2 0 72%,#596169 0)}
+.overview-v5-card strong{font-size:9px;color:#d6dade;font-weight:650;min-height:14px}
+.overview-v5-card label{font-size:8px;color:#9da5ad;text-transform:uppercase;letter-spacing:.7px;margin-top:4px}
+
+.overview-v5-main{display:grid;grid-template-columns:1.45fr .85fr;gap:14px;margin-bottom:14px}
+.overview-performance .chart-wrap{height:225px!important}
+.overview-system .panel-body{padding:14px}
+.overview-resource-rings{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:13px}
+.overview-resource{display:flex;align-items:center;gap:10px;background:#3e444a;border:1px solid #575f66;border-radius:12px;padding:10px}
+.overview-resource>div:nth-child(2){display:grid;gap:3px}
+.overview-resource b{font-size:10px}.overview-resource small{font-size:8px;color:#9fa6ad}
+.resource-circle{width:56px;height:56px;flex:0 0 56px;border-radius:50%;display:grid;place-items:center;border:7px solid #35c7c2;background:#454b52;font-size:11px;font-weight:800}
+.ram-circle{border-color:#8b9299}
+.overview-host{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.overview-host>div{background:#3e444a;border:1px solid #575f66;border-radius:9px;padding:9px 10px;min-width:0}
+.overview-host span{display:block;color:#9da5ad;font-size:8px;text-transform:uppercase;margin-bottom:4px}
+.overview-host b{display:block;font-size:9px;color:#eceeef;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.overview-v5-bottom{display:grid;grid-template-columns:1.08fr .92fr;gap:14px}
+.overview-v5-bottom .panel{height:315px}
+.overview-table{max-height:252px!important;overflow:auto}
+.overview-table table{min-width:600px}
+.overview-events{max-height:252px;overflow:auto}
+.overview-events .event-row{grid-template-columns:70px 125px 1fr!important;padding:10px 13px}
+.overview-events .event-time{display:none}
+
+/* Topology V5: centered hierarchical map, never clipped */
+#page-topology .topology-shell{height:560px!important;min-height:560px!important;max-height:560px!important;overflow:hidden!important}
+#page-topology .topology-canvas{height:560px!important;min-height:560px!important;position:relative!important}
+#page-topology .topology-node{width:136px!important;padding:11px 9px!important;border-radius:14px!important}
+#page-topology .topology-node.router{width:150px!important}
+#page-topology .topology-node .node-icon{width:32px;height:32px;margin-bottom:7px}
+#page-topology .node-name{font-size:10px}
+#page-topology .node-ip{font-size:8px}
+#page-topology .node-state{font-size:7px}
+#page-topology .topology-line{stroke-width:1.5!important;stroke-dasharray:5 5}
+
+/* Alerts V5: readable compact console instead of a giant page */
+#page-alerts .panel{max-height:none!important}
+#page-alerts #eventsList{height:560px;max-height:560px!important;overflow:auto;padding:8px 12px}
+#page-alerts #eventsList .event-row{grid-template-columns:78px 160px minmax(0,1fr) 145px;min-height:44px;padding:9px 8px;border-radius:7px;border-top:0;border-bottom:1px solid #555d64}
+#page-alerts #eventsList .event-row:hover{background:#4a5158}
+#page-alerts #eventsList .event-message{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#page-alerts #eventsList .event-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+@media(max-width:1050px){
+ .overview-v5-rings{grid-template-columns:repeat(3,1fr)}
+ .overview-v5-main,.overview-v5-bottom{grid-template-columns:1fr}
+ .overview-v5-bottom .panel{height:auto}
+}
+@media(max-width:700px){
+ .overview-v5-rings{grid-template-columns:repeat(2,1fr)}
+ .overview-resource-rings,.overview-host{grid-template-columns:1fr}
+ #page-alerts #eventsList .event-row{grid-template-columns:72px 1fr}
+ #page-alerts #eventsList .event-message,#page-alerts #eventsList .event-time{display:none}
+}
+
+.version-badge{display:inline-block;margin-top:5px;padding:3px 7px;border-radius:999px;background:#35c7c2;color:#fff;font-size:7px;font-weight:800;letter-spacing:.7px}
+
+/* ===== TOPOLOGY V6 — FREE DRAG LAYOUT ===== */
+#page-topology .topology-shell{
+    height:620px!important;
+    min-height:620px!important;
+    max-height:620px!important;
+    overflow:hidden!important;
+}
+#page-topology .topology-canvas{
+    height:620px!important;
+    min-height:620px!important;
+    position:relative!important;
+    overflow:hidden!important;
+}
+#page-topology .topology-node{
+    width:142px!important;
+    min-height:104px;
+    cursor:grab!important;
+    user-select:none;
+    touch-action:none;
+    z-index:3;
+    transition:border-color .15s ease,box-shadow .15s ease!important;
+}
+#page-topology .topology-node.dragging{
+    cursor:grabbing!important;
+    z-index:20!important;
+    border-color:#35c7c2!important;
+    box-shadow:0 10px 28px rgba(0,0,0,.28)!important;
+}
+#page-topology .topology-line{
+    pointer-events:none;
+}
+#page-topology .topology-reset-btn{
+    margin-left:auto;
+}
+
+
+/* ===== NetScope V7 — INCIDENT MANAGEMENT ===== */
+#page-incidents{max-width:1180px;margin:0 auto}
+.incident-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+.incident-stat{background:#454b52;border:1px solid #596169;border-radius:14px;padding:15px 16px;min-height:94px}
+.incident-stat label{display:block;color:#aeb4ba;font-size:8px;text-transform:uppercase;letter-spacing:.7px}
+.incident-stat strong{display:block;color:#f2f3f4;font-size:24px;margin-top:9px}
+.incident-stat small{display:block;color:#969da4;font-size:8px;margin-top:4px}
+.incident-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.incident-filter.active{background:#51483f!important;border-color:#b0733d!important;color:#ffb15c!important}
+.incident-table-wrap{max-height:500px;overflow:auto}
+.incident-table{min-width:850px}
+.incident-table th,.incident-table td{padding:11px 13px}
+.incident-device strong{display:block;font-size:10px;color:#f0f1f2}
+.incident-device span{display:block;font:8px Consolas;color:#aeb4ba;margin-top:3px}
+.incident-status{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;font-size:8px;font-weight:800;text-transform:uppercase}
+.incident-status:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.incident-active{color:#ffb3ba;background:#65454a}
+.incident-resolved{color:#9cdbb8;background:#3e5b4c}
+.incident-severity{color:#ffc16d;font-size:9px;font-weight:700}
+.incident-empty{padding:48px 20px;text-align:center;color:#9da5ad;font-size:11px}
+@media(max-width:850px){.incident-summary{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.incident-summary{grid-template-columns:1fr}}
+
+</style>
+<style>
+/* NetScope V9 — Premium Launch Experience */
+#nexusLaunch{
+  position:fixed;inset:0;z-index:99999;overflow:hidden;display:grid;place-items:center;color:#f7fbff;
+  background:
+    radial-gradient(circle at 50% 42%,rgba(42,201,197,.16),transparent 24%),
+    radial-gradient(circle at 20% 15%,rgba(73,137,255,.10),transparent 26%),
+    linear-gradient(145deg,#07111d 0%,#0a1725 48%,#06101a 100%);
+  transition:opacity .9s cubic-bezier(.2,.8,.2,1),visibility .9s;
+}
+#nexusLaunch.exit{opacity:0;visibility:hidden;pointer-events:none}
+.launchGrid{
+  position:absolute;inset:-35%;opacity:.13;
+  background-image:linear-gradient(rgba(101,220,217,.16) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(101,220,217,.16) 1px,transparent 1px);
+  background-size:58px 58px;
+  transform:perspective(760px) rotateX(64deg) translateY(28%);
+  animation:gridMove 8s linear infinite;
+}
+@keyframes gridMove{to{background-position:0 58px,58px 0}}
+.launchScan{
+  position:absolute;left:8%;right:8%;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(85,224,219,.75),transparent);
+  box-shadow:0 0 24px rgba(42,201,197,.38);animation:scan 4s ease-in-out infinite
+}
+@keyframes scan{0%{top:9%;opacity:0}18%{opacity:.75}82%{opacity:.5}100%{top:91%;opacity:0}}
+.launchCore{position:relative;z-index:2;text-align:center;width:min(800px,92vw)}
+.launchOrbit{width:285px;height:285px;margin:auto;display:grid;place-items:center;position:relative}
+.launchOrbit:before,.launchOrbit:after{
+  content:"";position:absolute;border-radius:50%;border:1px solid rgba(98,220,216,.24)
+}
+.launchOrbit:before{inset:0;border-left-color:#42d0cb;border-right-color:#4f8fff;animation:spin 10s linear infinite}
+.launchOrbit:after{inset:31px;border-top-color:#8ee9e5;border-bottom-color:rgba(79,143,255,.55);animation:spin 6s linear infinite reverse}
+.launchOrbit:after{box-shadow:inset 0 0 30px rgba(42,201,197,.025)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.launchLogo{
+  width:124px;height:124px;border-radius:31px;display:grid;place-items:center;
+  font-size:0;font-weight:800;
+  background:linear-gradient(145deg,rgba(19,50,70,.96),rgba(11,31,48,.98));
+  border:1px solid rgba(119,231,226,.55);
+  box-shadow:0 0 0 12px rgba(42,201,197,.035),0 0 70px rgba(42,201,197,.20),0 24px 60px rgba(0,0,0,.42);
+  animation:pulseLogo 2.8s ease-in-out infinite;
+}
+.launchLogo:before{
+  content:"NS";font-size:34px;letter-spacing:2px;
+  background:linear-gradient(135deg,#eafcff,#69ddd8 58%,#78a7ff);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+@keyframes pulseLogo{50%{transform:scale(1.035);box-shadow:0 0 0 17px rgba(42,201,197,.018),0 0 90px rgba(42,201,197,.27),0 24px 60px rgba(0,0,0,.42)}}
+.launchTitle{
+  font-size:52px;font-weight:760;letter-spacing:3px;margin-top:4px;
+  background:linear-gradient(180deg,#ffffff,#b9c9d7);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:titleIn 1.1s cubic-bezier(.2,.8,.2,1) both
+}
+@keyframes titleIn{from{opacity:0;transform:translateY(16px);letter-spacing:9px}}
+.launchSub{margin-top:10px;color:#7f9aae;font-size:10px;font-weight:650;letter-spacing:3.2px}
+.launchBox{
+  width:min(500px,86vw);margin:37px auto 0;padding:15px 17px;
+  background:rgba(8,23,36,.66);border:1px solid rgba(129,198,215,.13);
+  border-radius:14px;backdrop-filter:blur(14px);
+  box-shadow:0 20px 55px rgba(0,0,0,.20)
+}
+.launchRow{display:flex;justify-content:space-between;gap:16px;font:9px Consolas,monospace;color:#9fb3c2;letter-spacing:.35px}
+.launchRow b{color:#67ddd8}
+.launchProgress{height:3px;background:#142b3b;margin-top:13px;border-radius:20px;overflow:hidden}
+.launchProgress span{
+  display:block;width:0;height:100%;
+  background:linear-gradient(90deg,#397fd4,#3bcac5,#91e9e5);
+  box-shadow:0 0 14px rgba(59,202,197,.55);transition:width .55s ease
+}
+.launchFoot{margin-top:18px;font:8px Consolas,monospace;color:#50697b;letter-spacing:1.4px}
+.launchCorner{position:absolute;width:82px;height:82px;opacity:.25}
+.tl{left:28px;top:28px;border-left:1px solid #49c9c5;border-top:1px solid #49c9c5}
+.tr{right:28px;top:28px;border-right:1px solid #4f8fff;border-top:1px solid #4f8fff}
+.bl{left:28px;bottom:28px;border-left:1px solid #4f8fff;border-bottom:1px solid #4f8fff}
+.br{right:28px;bottom:28px;border-right:1px solid #49c9c5;border-bottom:1px solid #49c9c5}
+@media(max-width:650px){
+ .launchOrbit{width:215px;height:215px}.launchLogo{width:98px;height:98px;border-radius:25px}
+ .launchLogo:before{font-size:28px}.launchTitle{font-size:38px}.launchSub{font-size:8px;letter-spacing:2px}
+}
+</style>
+
+<style id="netscope-v10-theme">
+:root{
+ --ns-bg:#07111d;--ns-sidebar:#091522;--ns-panel:#0e2031;--ns-panel2:#112638;
+ --ns-border:#1d3a50;--ns-text:#f4f8fb;--ns-muted:#91a7b8;
+ --ns-cyan:#25c7e8;--ns-teal:#35d0c5;--ns-green:#39d98a;
+ --ns-red:#ff5967;--ns-warning:#f6a51a;--ns-blue:#418cff;
+}
+body{background:var(--ns-bg)!important;color:var(--ns-text)!important}
+.sidebar{background:linear-gradient(180deg,#091522,#07111d)!important;border-right:1px solid #173146!important}
+.topbar,.header{background:rgba(9,21,34,.96)!important;border-color:#173146!important}
+.card,.panel,.metric-card,.overview-card,.chart-card,.table-card,.section-card{
+ background:linear-gradient(145deg,#102335,#0c1d2c)!important;
+ border-color:#1b3a50!important;
+ box-shadow:0 14px 35px rgba(0,0,0,.16)!important
+}
+h1,h2,h3,.page-title{color:#f7fbff!important}
+.subtitle,.muted,.card-label{color:#91a7b8!important}
+.nav-btn{color:#9eb2c2!important;border-left-color:transparent!important}
+.nav-btn:hover{background:#102a3e!important;color:#e9fbff!important}
+.nav-btn.active{background:linear-gradient(90deg,rgba(37,199,232,.16),rgba(53,208,197,.07))!important;color:#72e2e5!important;border-left-color:#35d0c5!important}
+button,.btn{border-color:#25506a}
+.primary-btn,.scan-btn,#scanBtn{
+ background:linear-gradient(135deg,#168bd0,#24c8d7)!important;
+ border-color:#32d5dd!important;color:white!important;
+ box-shadow:0 8px 24px rgba(37,199,232,.18)!important
+}
+table{color:#dfeaf1!important} th{color:#89a5b7!important;border-color:#1a3447!important}
+td{border-color:#162f42!important}
+input,select{background:#0a1b2a!important;color:#eaf4f8!important;border-color:#21465d!important}
+</style>
+
+
+<style id="netscope-v10-logo">
+.logo,.brand-logo,.sidebar-logo{
+ background:transparent!important;color:#55d9e2!important;
+ border:none!important;box-shadow:none!important;
+ font-weight:900!important;letter-spacing:-2px!important
+}
+.logo::first-letter,.brand-logo::first-letter{color:#3d8cff}
+</style>
+
+
+<style id="netscope-v11-full-ui">
+:root{
+ --ns-bg:#07111c; --ns-bg2:#091624; --ns-side:#071421;
+ --ns-card:#102233; --ns-card2:#0d1d2c; --ns-card3:#13283a;
+ --ns-line:#1b3b50; --ns-line2:#21485f;
+ --ns-text:#f4f8fb; --ns-muted:#8198aa;
+ --ns-cyan:#25c7e8; --ns-teal:#38d0c5; --ns-blue:#3d8cff;
+ --ns-green:#35d07f; --ns-red:#ff5b68; --ns-amber:#f4a51c;
+}
+html,body,.app,.main,.content{background:var(--ns-bg)!important;color:var(--ns-text)!important}
+body{background:
+ radial-gradient(circle at 76% 8%,rgba(37,199,232,.045),transparent 24%),
+ linear-gradient(145deg,#07111c,#09131e)!important}
+.sidebar{
+ background:linear-gradient(180deg,#081624 0%,#06111c 100%)!important;
+ border-right:1px solid #163247!important;box-shadow:none!important
+}
+.brand{gap:13px!important;padding-top:5px!important}
+.brand-logo{
+ width:42px!important;height:42px!important;border-radius:0!important;
+ background:transparent!important;border:0!important;box-shadow:none!important;
+ color:transparent!important;position:relative!important;font-size:0!important
+}
+.brand-logo:after{
+ content:"NS";font-size:20px;font-weight:900;letter-spacing:-2px;
+ background:linear-gradient(135deg,#3d8cff 8%,#25c7e8 48%,#38d0c5 88%);
+ -webkit-background-clip:text;background-clip:text;color:transparent;
+ filter:drop-shadow(0 0 10px rgba(37,199,232,.18))
+}
+.brand h1{font-size:17px!important;color:#f7fbff!important;letter-spacing:.1px!important}
+.brand p{font-size:8px!important;color:#71899c!important;letter-spacing:.55px!important}
+.nav-label{color:#4e6a80!important;font-size:9px!important}
+.nav-btn{color:#86a0b4!important;border-radius:10px!important;margin:1px 0!important}
+.nav-btn:hover{background:#0d2233!important;color:#dff9ff!important}
+.nav-btn.active{
+ background:linear-gradient(90deg,rgba(37,199,232,.16),rgba(56,208,197,.055))!important;
+ color:#63dbe3!important;box-shadow:inset 3px 0 0 #38d0c5!important
+}
+.nav-icon{color:#6caec8!important}
+.sidebar-bottom{border-color:#173246!important}.monitor-state{color:#5f788c!important}
+
+.topbar{
+ background:rgba(7,20,32,.94)!important;border-color:#173348!important;
+ box-shadow:0 8px 24px rgba(0,0,0,.12)!important
+}
+.top-title h2{color:#f6f9fc!important}.top-title p{color:#7890a2!important}
+.clock{background:#0d1f2e!important;border-color:#214257!important;color:#a7bac8!important}
+.primary-btn{
+ background:linear-gradient(135deg,#178ecb,#25c7d7)!important;border:1px solid #35d5dc!important;
+ color:white!important;box-shadow:0 7px 20px rgba(37,199,232,.16)!important
+}
+.secondary-btn,.analytics-select,.searchbar input{
+ background:#0c1c2a!important;border-color:#244358!important;color:#dbe8ef!important
+}
+.small-btn{background:#10283a!important;border-color:#27536b!important;color:#74dce4!important}
+.danger-btn{background:rgba(255,91,104,.09)!important;border-color:rgba(255,91,104,.35)!important;color:#ff8791!important}
+
+.page-head h2{color:#f7fafc!important}.page-head p{color:#8299aa!important}
+.kpi,.panel,.device-card,.analytics-card,.resource,.mini-stat,.modal-stat,.modal,
+.report-card,.setting-card,.analytics-v2-card,.analytics-ring-card,.overview-v4-card,
+.overview-v5-card,.incident-stat{
+ background:linear-gradient(145deg,var(--ns-card),var(--ns-card2))!important;
+ border:1px solid var(--ns-line)!important;
+ box-shadow:0 14px 34px rgba(0,0,0,.16)!important;color:var(--ns-text)!important
+}
+.panel-head,.panel-body{background:transparent!important;border-color:var(--ns-line)!important}
+h1,h2,h3,.device-name,.resource-value,.mini-stat strong,.modal-stat strong,
+.setting-head h3,.threshold-chip strong,.analytics-v2-card strong,.incident-stat strong{
+ color:#f3f8fb!important
+}
+p,.kpi-label,.kpi-sub,.resource-name,.analytics-note,.event-message,.event-time,.ipline,.mono,
+.node-ip,.discovery-status,.report-card label,.setting-head p,.threshold-chip label,
+.analytics-v2-card label,.analytics-v2-card span,.incident-stat label,.incident-stat small{
+ color:var(--ns-muted)!important
+}
+
+/* Overview */
+.overview-v5-card{min-height:150px!important;border-radius:15px!important}
+.overview-v5-ring,.overview-v4-ring,.analytics-ring{background-color:#183247!important}
+.overview-v5-ring:before,.overview-v4-ring:before,.analytics-ring:before{background:#102233!important}
+.overview-v5-ring.alert-ring{background:conic-gradient(var(--ns-amber) 0 100%,#1a3448 0)!important}
+.overview-v5-ring.latency-ring{background:conic-gradient(var(--ns-cyan) 0 72%,#1a3448 0)!important}
+.overview-resource,.overview-host>div,.analytics-device-health,.threshold-chip,.analytics-mini-stat{
+ background:#0c1d2c!important;border-color:#1d3b50!important
+}
+.resource-circle{background:#102233!important;border-color:var(--ns-teal)!important}
+.ram-circle{border-color:#688399!important}
+.overview-live{background:rgba(53,208,127,.11)!important;border-color:rgba(53,208,127,.24)!important;color:#7fe0a9!important}
+
+/* Tables and event surfaces */
+table,tbody{background:transparent!important}
+thead,th{background:#0b1b29!important;color:#718da1!important;border-color:#18364a!important}
+td{background:transparent!important;color:#c7d5df!important;border-color:#18364a!important}
+tbody tr:hover td{background:#11283a!important}
+.event-row,.meta-row,.analytics-problem-row,.toggle-row{border-color:#1a394d!important}
+#page-alerts #eventsList .event-row:hover{background:#102638!important}
+
+/* Devices */
+.device-card{border-radius:14px!important}
+.mini-stat{box-shadow:none!important}
+.online,.sev-success{color:#79e0a5!important;background:rgba(53,208,127,.11)!important}
+.offline,.sev-critical{color:#ff8d96!important;background:rgba(255,91,104,.12)!important}
+.sev-warning{color:#ffc766!important;background:rgba(244,165,28,.13)!important}
+.sev-info{color:#74d7f3!important;background:rgba(37,199,232,.11)!important}
+
+/* Analytics */
+.analytics-ring{background:conic-gradient(var(--ring) calc(var(--value)*1%),#1b394d 0)!important}
+.analytics-progress,.progress{background:#193448!important}
+.analytics-progress>span{background:linear-gradient(90deg,#248bd5,#38d0c5)!important}
+.progress span{background:linear-gradient(90deg,#268fd3,#2fcbd2)!important}
+.progress.ram span{background:linear-gradient(90deg,#4f79bd,#72a2df)!important}
+.analytics-period-btn.active{
+ background:linear-gradient(135deg,#238fcf,#35cfc7)!important;border-color:#47dcd4!important;color:#fff!important
+}
+
+/* Settings */
+.setting-value{color:#71dce0!important}
+.setting-card input[type="range"]{accent-color:#35cfc7!important}
+.switch span{background:#152d3f!important;border-color:#29495d!important}
+.switch span:before{background:#7790a2!important}
+.switch input:checked + span{background:#176e75!important;border-color:#2fc9c5!important}
+.switch input:checked + span:before{background:#8bf0e9!important}
+
+/* Reports */
+.report-meta div{background:#0c1d2c!important;border-color:#1d3b50!important}
+.report-meta label,.report-note{color:#8198aa!important}
+.report-meta span{color:#e3edf3!important}
+
+/* Incidents */
+.incident-filter.active{background:#103b45!important;border-color:#2b8e92!important;color:#75e1df!important}
+.incident-active{color:#ff929a!important;background:rgba(255,91,104,.13)!important}
+.incident-resolved{color:#83e1aa!important;background:rgba(53,208,127,.11)!important}
+.incident-severity{color:#ffc66a!important}
+
+/* Topology */
+.topology-shell,.topology-canvas{background-color:#091927!important}
+.topology-shell{
+ background:
+ radial-gradient(circle at center,rgba(37,199,232,.07),transparent 36%),
+ linear-gradient(rgba(63,117,145,.10) 1px,transparent 1px),
+ linear-gradient(90deg,rgba(63,117,145,.10) 1px,transparent 1px),
+ #091927!important;background-size:auto,32px 32px,32px 32px,auto!important
+}
+.topology-node{background:#102536!important;border-color:#22475d!important}
+.topology-node.router{background:linear-gradient(145deg,#103047,#0d2435)!important;border-color:#2d7894!important}
+.node-icon{background:#0a1b29!important;color:#4ed7df!important}
+.topology-line{stroke:#31566d!important}.topology-line.online-line{stroke:#2f9b68!important}.topology-line.offline-line{stroke:#b44f5b!important}
+#page-topology .topology-node.dragging{border-color:#38d0c5!important}
+
+/* Scrollbars */
+*::-webkit-scrollbar{width:7px;height:7px}
+*::-webkit-scrollbar-track{background:#081724}
+*::-webkit-scrollbar-thumb{background:#284b60;border-radius:99px}
+*::-webkit-scrollbar-thumb:hover{background:#35657f}
+
+/* Remove leftover orange from generic accents; amber remains only for warning states */
+.version-badge{background:#1b8590!important;color:#dffcff!important}
+</style>
+
+
+<style id="netscope-v12-overview">
+/* NetScope V12 — Overview refinement only */
+#page-overview{max-width:1220px!important}
+#page-overview .overview-head{margin-bottom:18px!important}
+#page-overview .overview-head h2{font-size:27px!important;letter-spacing:-.5px}
+#page-overview .overview-head p{font-size:11px!important}
+
+/* KPI row */
+#page-overview .overview-v5-rings{gap:13px!important;margin-bottom:16px!important}
+#page-overview .overview-v5-card{
+ min-height:148px!important;padding:16px 10px 13px!important;
+ border-radius:17px!important;position:relative!important;overflow:hidden!important;
+ background:linear-gradient(145deg,#102536,#0c1d2c)!important;
+}
+#page-overview .overview-v5-card:after{
+ content:"";position:absolute;width:90px;height:90px;border-radius:50%;
+ right:-42px;top:-42px;background:rgba(37,199,232,.035);pointer-events:none
+}
+#page-overview .overview-v5-ring{
+ width:78px!important;height:78px!important;margin-bottom:9px!important;
+ filter:drop-shadow(0 7px 12px rgba(0,0,0,.12))
+}
+#page-overview .overview-v5-ring:before{inset:8px!important;background:#102536!important}
+#page-overview .overview-v5-ring span{font-size:16px!important}
+#page-overview .overview-v5-card strong{font-size:9px!important;color:#dce8ef!important}
+#page-overview .overview-v5-card label{font-size:7px!important;color:#71899b!important}
+
+/* Network health becomes product-primary cyan instead of warning amber */
+#page-overview .overview-v5-card:first-child .overview-v5-ring{
+ background:conic-gradient(#25c7e8 0 var(--health-angle,288deg),#1b394d 0)!important
+}
+
+/* Main workspace */
+#page-overview .overview-v5-main{grid-template-columns:1.55fr .9fr!important;gap:15px!important;margin-bottom:15px!important}
+#page-overview .overview-performance,#page-overview .overview-system{border-radius:17px!important}
+#page-overview .panel-head{padding:14px 17px!important}
+#page-overview .panel-head h3{font-size:12px!important}
+#page-overview .overview-performance .chart-wrap{height:235px!important}
+#page-overview .overview-system .panel-body{padding:13px!important}
+#page-overview .overview-resource{padding:11px!important;border-radius:13px!important}
+#page-overview .resource-circle{width:58px!important;height:58px!important;flex-basis:58px!important;border-width:6px!important}
+#page-overview .overview-host>div{padding:10px!important;background:#0b1c2a!important}
+
+/* Bottom cards */
+#page-overview .overview-v5-bottom{grid-template-columns:1.08fr .92fr!important;gap:15px!important}
+#page-overview .overview-v5-bottom .panel{height:305px!important;border-radius:17px!important}
+#page-overview .overview-table,#page-overview .overview-events{max-height:244px!important}
+#page-overview th{font-size:8px!important;padding:9px 13px!important}
+#page-overview td{padding:10px 13px!important}
+#page-overview .overview-events .event-row{
+ grid-template-columns:68px 118px minmax(0,1fr)!important;padding:9px 12px!important
+}
+
+/* subtle cyan top-edge on primary cards */
+#page-overview .overview-performance:before,#page-overview .overview-system:before{
+ content:"";display:block;height:2px;
+ background:linear-gradient(90deg,transparent,rgba(37,199,232,.7),rgba(56,208,197,.35),transparent)
+}
+
+/* clearer status hierarchy */
+#page-overview .online-ring{box-shadow:0 0 22px rgba(53,208,127,.06)}
+#page-overview .offline-ring{box-shadow:0 0 22px rgba(255,91,104,.06)}
+#page-overview .alert-ring{box-shadow:0 0 22px rgba(244,165,28,.05)}
+#page-overview .latency-ring{box-shadow:0 0 22px rgba(37,199,232,.07)}
+
+@media(max-width:1050px){
+ #page-overview .overview-v5-main,#page-overview .overview-v5-bottom{grid-template-columns:1fr!important}
+ #page-overview .overview-v5-bottom .panel{height:auto!important}
+}
+</style>
+
+
+<style id="netscope-v13-overview-rebuild">
+/* ===== NetScope V13 — Overview Rebuild ===== */
+#page-overview{max-width:1240px!important}
+#page-overview .overview-head{margin-bottom:18px!important}
+#page-overview .overview-v5-rings{
+ display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;
+ gap:13px!important;margin-bottom:16px!important
+}
+#page-overview .overview-v5-card{
+ min-height:132px!important;padding:15px!important;text-align:left!important;
+ display:grid!important;grid-template-columns:68px minmax(0,1fr)!important;
+ grid-template-rows:auto auto!important;align-items:center!important;column-gap:13px!important;
+ background:linear-gradient(145deg,#102536,#0b1c2b)!important;
+ border:1px solid #1c3c51!important;border-radius:16px!important
+}
+#page-overview .overview-v5-ring{
+ grid-row:1 / span 2!important;width:64px!important;height:64px!important;margin:0!important;
+ background:conic-gradient(#25c7e8 0 var(--health-angle,288deg),#1a384c 0)!important
+}
+#page-overview .overview-v5-ring:before{inset:7px!important;background:#102536!important}
+#page-overview .overview-v5-ring span{font-size:14px!important}
+#page-overview .overview-v5-card strong{
+ align-self:end!important;font-size:10px!important;line-height:1.25!important;color:#edf6fa!important;
+ min-height:0!important;margin:0!important
+}
+#page-overview .overview-v5-card label{
+ align-self:start!important;font-size:7px!important;line-height:1.35!important;margin-top:4px!important;
+ color:#718a9c!important
+}
+/* Semantic KPI colors */
+#page-overview .overview-v5-card:nth-child(1) .overview-v5-ring{
+ background:conic-gradient(#25c7e8 0 var(--health-angle,288deg),#1a384c 0)!important
+}
+#page-overview .overview-v5-card:nth-child(2) .overview-v5-ring{
+ background:conic-gradient(#35d07f 0 var(--online-angle,288deg),#1a384c 0)!important
+}
+#page-overview .overview-v5-card:nth-child(3) .overview-v5-ring{
+ background:conic-gradient(#ff5b68 0 var(--offline-angle,72deg),#1a384c 0)!important
+}
+#page-overview .overview-v5-card:nth-child(4) .overview-v5-ring{
+ background:conic-gradient(#f4a51c 0 var(--alert-angle,300deg),#1a384c 0)!important
+}
+#page-overview .overview-v5-card:nth-child(5) .overview-v5-ring{
+ background:conic-gradient(#25c7e8 0 var(--latency-angle,250deg),#1a384c 0)!important
+}
+/* Larger, cleaner workspace */
+#page-overview .overview-v5-main{
+ display:grid!important;grid-template-columns:minmax(0,1.7fr) minmax(290px,.9fr)!important;
+ gap:14px!important;margin-bottom:14px!important
+}
+#page-overview .overview-performance,#page-overview .overview-system,
+#page-overview .overview-v5-bottom .panel{border-radius:16px!important}
+#page-overview .overview-performance .chart-wrap{height:245px!important}
+#page-overview .overview-resource-rings{gap:10px!important}
+#page-overview .overview-resource{background:#0b1d2c!important}
+#page-overview .overview-host>div{background:#0a1a28!important}
+#page-overview .overview-v5-bottom{
+ display:grid!important;grid-template-columns:1.08fr .92fr!important;gap:14px!important
+}
+#page-overview .overview-v5-bottom .panel{height:300px!important}
+#page-overview .overview-table,#page-overview .overview-events{max-height:239px!important}
+/* Cleaner headers */
+#page-overview .panel-head{min-height:58px!important;padding:13px 16px!important}
+#page-overview .panel-head h3{font-size:12px!important}
+#page-overview .panel-head p{font-size:8px!important;margin-top:3px!important}
+@media(max-width:1100px){
+ #page-overview .overview-v5-rings{grid-template-columns:repeat(3,1fr)!important}
+ #page-overview .overview-v5-main,#page-overview .overview-v5-bottom{grid-template-columns:1fr!important}
+ #page-overview .overview-v5-bottom .panel{height:auto!important}
+}
+@media(max-width:720px){
+ #page-overview .overview-v5-rings{grid-template-columns:1fr 1fr!important}
+ #page-overview .overview-v5-card{grid-template-columns:58px 1fr!important}
+ #page-overview .overview-v5-ring{width:54px!important;height:54px!important}
+}
+</style>
+
+
+<style id="netscope-v13-1-stability">
+/* V13.1 — overview stability fixes */
+
+/* Give Chart.js a deterministic canvas box after the V13 layout change */
+#page-overview .overview-performance .chart-wrap{
+    position:relative!important;
+    width:100%!important;
+    height:245px!important;
+    min-height:245px!important;
+    overflow:hidden!important;
+}
+#page-overview .overview-performance .chart-wrap canvas{
+    display:block!important;
+    width:100%!important;
+    height:100%!important;
+    max-width:100%!important;
+    max-height:245px!important;
+}
+
+/* KPI copy: more breathing room and no awkward wrapping */
+#page-overview .overview-v5-card{
+    grid-template-columns:66px minmax(88px,1fr)!important;
+    column-gap:14px!important;
+}
+#page-overview .overview-v5-card strong{
+    font-size:9px!important;
+    line-height:1.35!important;
+    white-space:normal!important;
+    overflow-wrap:normal!important;
+    word-break:normal!important;
+}
+#page-overview .overview-v5-card label{
+    font-size:7px!important;
+    line-height:1.35!important;
+    letter-spacing:.45px!important;
+}
+
+/* Snapshot should fit without a horizontal scrollbar */
+#page-overview .overview-v5-bottom .panel:first-child,
+#page-overview .overview-table{
+    overflow-x:hidden!important;
+}
+#page-overview .overview-table table{
+    width:100%!important;
+    min-width:0!important;
+    table-layout:fixed!important;
+}
+#page-overview .overview-table th,
+#page-overview .overview-table td{
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+}
+#page-overview .overview-table th:nth-child(1),
+#page-overview .overview-table td:nth-child(1){width:43%!important}
+#page-overview .overview-table th:nth-child(2),
+#page-overview .overview-table td:nth-child(2){width:24%!important}
+#page-overview .overview-table th:nth-child(3),
+#page-overview .overview-table td:nth-child(3){width:19%!important}
+#page-overview .overview-table th:nth-child(4),
+#page-overview .overview-table td:nth-child(4){width:14%!important}
+
+@media(max-width:1180px){
+ #page-overview .overview-v5-card{grid-template-columns:58px minmax(74px,1fr)!important;column-gap:10px!important}
+ #page-overview .overview-v5-ring{width:56px!important;height:56px!important}
+}
+</style>
+
+
+<style id="netscope-v14-devices">
+/* ===== NetScope V14 — Devices Redesign ===== */
+#page-devices{max-width:1240px!important}
+#page-devices .page-head{margin-bottom:14px!important}
+#page-devices .page-head h2{font-size:27px!important;letter-spacing:-.4px}
+#page-devices .page-head p{font-size:11px!important}
+#page-devices .searchbar{width:285px!important}
+
+/* Summary strip injected by V14 */
+#deviceV14Summary{
+ display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 15px
+}
+.device-v14-stat{
+ min-height:78px;padding:13px 15px;border-radius:14px;
+ background:linear-gradient(145deg,#102536,#0b1c2b);
+ border:1px solid #1c3c51;display:flex;align-items:center;gap:12px
+}
+.device-v14-icon{
+ width:42px;height:42px;border-radius:12px;display:grid;place-items:center;
+ background:#0a1b29;border:1px solid #1e455b;color:#52d8df;font-size:16px;font-weight:800
+}
+.device-v14-stat.online .device-v14-icon{color:#61df99;border-color:rgba(53,208,127,.25);background:rgba(53,208,127,.07)}
+.device-v14-stat.offline .device-v14-icon{color:#ff7b86;border-color:rgba(255,91,104,.28);background:rgba(255,91,104,.07)}
+.device-v14-copy strong{display:block;font-size:18px;color:#f4f9fc;line-height:1}
+.device-v14-copy span{display:block;margin-top:6px;font-size:7px;letter-spacing:.7px;color:#71899b;text-transform:uppercase}
+
+/* Device grid */
+#deviceGrid{
+ display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ gap:14px!important;align-items:stretch!important
+}
+#page-devices .device-card{
+ min-height:205px!important;padding:16px!important;border-radius:16px!important;
+ background:linear-gradient(145deg,#102536,#0b1c2b)!important;
+ border:1px solid #1c3c51!important;position:relative!important;overflow:hidden!important
+}
+#page-devices .device-card:before{
+ content:"";position:absolute;left:0;top:0;bottom:0;width:2px;
+ background:linear-gradient(180deg,transparent,#25c7e8,transparent);opacity:.5
+}
+#page-devices .device-card:after{
+ content:"";position:absolute;width:100px;height:100px;border-radius:50%;
+ right:-55px;top:-55px;background:rgba(37,199,232,.035);pointer-events:none
+}
+#page-devices .device-head{margin-bottom:13px!important}
+#page-devices .device-name{font-size:13px!important;letter-spacing:-.1px}
+#page-devices .ipline{font-size:8px!important;margin-top:4px!important}
+#page-devices .status{
+ padding:7px 10px!important;border-radius:999px!important;font-size:8px!important;
+ border:1px solid transparent!important
+}
+#page-devices .status.online{border-color:rgba(53,208,127,.2)!important}
+#page-devices .status.offline{border-color:rgba(255,91,104,.22)!important}
+
+/* Metrics */
+#page-devices .device-stats{
+ display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:8px!important;margin:0 0 13px!important
+}
+#page-devices .mini-stat{
+ min-height:58px!important;padding:10px!important;border-radius:11px!important;
+ background:#0a1b29!important;border:1px solid #193b50!important
+}
+#page-devices .mini-stat span{font-size:7px!important;color:#668196!important;letter-spacing:.45px}
+#page-devices .mini-stat strong{font-size:12px!important;margin-top:6px!important;color:#eff7fa!important}
+#page-devices .device-foot{
+ margin-top:auto!important;padding-top:10px!important;border-top:1px solid #17384c!important
+}
+#page-devices .device-foot>span{font-size:8px!important}
+#page-devices .small-btn{border-radius:9px!important;padding:8px 12px!important}
+#page-devices .danger-btn{border-radius:9px!important;padding:8px 12px!important}
+
+/* Search */
+#page-devices .searchbar input{
+ height:39px!important;border-radius:10px!important;background:#0a1b29!important;
+ border:1px solid #1e4157!important;padding:0 13px!important
+}
+#page-devices .searchbar input:focus{
+ border-color:#2ebec9!important;box-shadow:0 0 0 3px rgba(37,199,232,.07)!important;outline:none!important
+}
+
+@media(max-width:1100px){
+ #deviceGrid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ #deviceV14Summary{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:700px){
+ #deviceGrid{grid-template-columns:1fr!important}
+ #deviceV14Summary{grid-template-columns:1fr 1fr}
+ #page-devices .page-head{align-items:flex-start!important;gap:12px!important}
+ #page-devices .searchbar{width:100%!important}
+}
+</style>
+
+
+<style id="netscope-v14-1-summary-fix">
+#deviceV14Summary{
+ display:grid!important;
+ grid-template-columns:repeat(4,minmax(0,1fr))!important;
+ gap:12px!important;
+ margin:0 0 15px!important;
+ width:100%!important
+}
+.device-v14-stat{
+ min-height:76px!important;padding:13px 15px!important;border-radius:14px!important;
+ background:linear-gradient(145deg,#102536,#0b1c2b)!important;
+ border:1px solid #1c3c51!important;display:flex!important;align-items:center!important;gap:12px!important
+}
+.device-v14-icon{
+ width:40px!important;height:40px!important;flex:0 0 40px!important;border-radius:11px!important;
+ display:grid!important;place-items:center!important;background:#0a1b29!important;
+ border:1px solid #1e455b!important;color:#52d8df!important;font-size:13px!important;font-weight:800!important
+}
+.device-v14-stat.online .device-v14-icon{color:#61df99!important;border-color:rgba(53,208,127,.25)!important}
+.device-v14-stat.offline .device-v14-icon{color:#ff7b86!important;border-color:rgba(255,91,104,.28)!important}
+.device-v14-copy strong{display:block!important;font-size:18px!important;color:#f4f9fc!important;line-height:1!important}
+.device-v14-copy span{display:block!important;margin-top:6px!important;font-size:7px!important;letter-spacing:.7px!important;color:#71899b!important}
+@media(max-width:900px){ #deviceV14Summary{grid-template-columns:repeat(2,1fr)!important}}
+</style>
+
+
+<style id="netscope-v15-notification-center">
+/* NetScope V15 — Notification Center */
+.ns-notify-wrap{position:relative;display:inline-flex;align-items:center}
+.ns-notify-btn{
+ width:38px;height:38px;border-radius:10px;border:1px solid #214257;background:#0d1f2e;
+ color:#9eb8c8;display:grid;place-items:center;cursor:pointer;position:relative;
+ transition:.2s ease;font-size:16px
+}
+.ns-notify-btn:hover{border-color:#2ebec9;color:#6ce0e5;background:#10283a}
+.ns-notify-badge{
+ position:absolute;right:-5px;top:-6px;min-width:17px;height:17px;padding:0 4px;border-radius:20px;
+ background:#ff5b68;color:#fff;border:2px solid #071421;font:700 8px/13px Arial;text-align:center;
+ display:none
+}
+.ns-notify-badge.show{display:block}
+.ns-notify-panel{
+ position:absolute;right:0;top:48px;width:365px;max-height:480px;z-index:9000;
+ background:linear-gradient(155deg,#102536,#091a28);border:1px solid #21475d;border-radius:15px;
+ box-shadow:0 24px 60px rgba(0,0,0,.42);overflow:hidden;display:none
+}
+.ns-notify-panel.open{display:block;animation:nsNotifyIn .16s ease-out}
+@keyframes nsNotifyIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.ns-notify-head{padding:14px 15px;border-bottom:1px solid #1b3a4e;display:flex;justify-content:space-between;align-items:center}
+.ns-notify-head strong{font-size:12px;color:#f1f7fa}
+.ns-notify-head span{font-size:8px;color:#6f8b9e}
+.ns-notify-actions{display:flex;gap:7px}
+.ns-notify-action{
+ border:1px solid #23495f;background:#0c2030;color:#75dce2;border-radius:8px;
+ padding:6px 8px;font-size:8px;cursor:pointer
+}
+.ns-notify-list{max-height:365px;overflow:auto}
+.ns-notify-item{
+ display:grid;grid-template-columns:9px 1fr auto;gap:10px;padding:12px 14px;
+ border-bottom:1px solid #173549;cursor:pointer;background:rgba(7,20,32,.22)
+}
+.ns-notify-item:hover{background:#10293b}
+.ns-notify-item.unread{background:rgba(37,199,232,.055)}
+.ns-notify-dot{width:7px;height:7px;border-radius:50%;margin-top:4px;background:#25c7e8}
+.ns-notify-item.warning .ns-notify-dot{background:#f4a51c}
+.ns-notify-item.critical .ns-notify-dot{background:#ff5b68}
+.ns-notify-item.success .ns-notify-dot{background:#35d07f}
+.ns-notify-copy strong{display:block;color:#dce9f0;font-size:9px;line-height:1.35}
+.ns-notify-copy p{margin:3px 0 0;color:#7893a5;font-size:8px;line-height:1.45}
+.ns-notify-time{font-size:7px;color:#587386;white-space:nowrap;padding-top:2px}
+.ns-notify-empty{padding:30px;text-align:center;color:#668195;font-size:9px}
+.ns-notify-foot{padding:10px 14px;border-top:1px solid #1b3a4e;color:#587386;font-size:8px;text-align:center}
+@media(max-width:650px){.ns-notify-panel{position:fixed;right:12px;left:12px;top:68px;width:auto}}
+</style>
+
+
+<style id="netscope-v16-features">
+/* V16 Traffic + Device Intelligence */
+.ns-v16-traffic{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+.ns-v16-metric{padding:14px;border:1px solid #1c3c51;border-radius:14px;background:linear-gradient(145deg,#102536,#0b1c2b)}
+.ns-v16-metric label{font-size:7px;letter-spacing:.7px;color:#71899b;text-transform:uppercase}.ns-v16-metric strong{display:block;margin-top:7px;font-size:17px;color:#f3f8fb}
+.ns-v16-chart{height:280px;padding:14px;border:1px solid #1c3c51;border-radius:16px;background:linear-gradient(145deg,#102536,#0b1c2b)}
+.ns-v16-device-extra{display:grid;grid-template-columns:1.15fr .85fr;gap:12px;margin-top:14px}.ns-v16-box{padding:14px;border:1px solid #1b3b50;border-radius:12px;background:#0a1b29}.ns-v16-box h4{font-size:10px;margin-bottom:10px;color:#eaf5f8}.ns-v16-box p{font-size:8px;line-height:1.7;color:#7893a5}.ns-v16-snmp-btn{margin-top:10px}
+.ns-v16-auth{font-size:8px;color:#7893a5!important}
+@media(max-width:850px){.ns-v16-traffic{grid-template-columns:1fr 1fr}.ns-v16-device-extra{grid-template-columns:1fr}}
+</style>
+
+<style>
+/* ===== NetScope Device Details V2 — Compact ===== */
+#deviceModal .modal{
+    width:min(1040px,96vw)!important;
+    max-height:86vh!important;
+}
+#deviceModal .modal-head{
+    padding:14px 18px!important;
+}
+#deviceModal .modal-body{
+    padding:15px 18px 18px!important;
+}
+#deviceModal .modal-stats{
+    grid-template-columns:repeat(6,minmax(0,1fr))!important;
+    gap:8px!important;
+    margin-bottom:12px!important;
+}
+#deviceModal .modal-stat{
+    padding:10px 11px!important;
+}
+#deviceModal .modal-stat strong{
+    font-size:14px!important;
+}
+#deviceModal .table-wrap{
+    max-height:205px!important;
+    overflow:auto!important;
+}
+#deviceModal .table-wrap table{
+    min-width:720px!important;
+}
+#deviceModal .table-wrap th{
+    padding:8px 10px!important;
+}
+#deviceModal .table-wrap td{
+    padding:9px 10px!important;
+}
+
+/* V16 enhancement area */
+#deviceModal #v16SnmpText{
+    font-size:9px!important;
+    line-height:1.55!important;
+}
+#deviceModal #v16SnmpText table{
+    min-width:560px!important;
+}
+#deviceModal #v16SnmpText th,
+#deviceModal #v16SnmpText td{
+    padding:7px 8px!important;
+    font-size:9px!important;
+}
+#deviceModal #v16SnmpBtn{
+    margin-top:9px!important;
+}
+
+/* The two appended cards: Intelligence + SNMP */
+#deviceModal .modal-body > div:last-child{
+    gap:10px!important;
+    margin-top:12px!important;
+}
+#deviceModal .modal-body > div:last-child > div:first-child{
+    max-width:220px!important;
+    flex:0 0 220px!important;
+}
+#deviceModal .modal-body > div:last-child > div:last-child{
+    min-width:0!important;
+    flex:1 1 auto!important;
+}
+
+@media(max-width:900px){
+    #deviceModal .modal-stats{
+        grid-template-columns:repeat(3,1fr)!important;
+    }
+    #deviceModal .modal-body > div:last-child{
+        display:grid!important;
+        grid-template-columns:1fr!important;
+    }
+    #deviceModal .modal-body > div:last-child > div:first-child{
+        max-width:none!important;
+    }
+}
+</style>
+
+
+<style>
+/* ===== NetScope Device Details V3 — Balanced Final Layout ===== */
+#deviceModal .modal-body > div:last-child{
+    display:block!important;
+    margin-top:12px!important;
+}
+#deviceModal .modal-body > div:last-child > div:first-child{
+    max-width:none!important;
+    width:100%!important;
+    min-height:0!important;
+    padding:9px 12px!important;
+    margin-bottom:9px!important;
+}
+#deviceModal .modal-body > div:last-child > div:first-child h4{
+    display:inline-block!important;
+    margin:0 10px 0 0!important;
+    font-size:9px!important;
+}
+#deviceModal .modal-body > div:last-child > div:first-child p{
+    display:inline!important;
+    font-size:8px!important;
+    line-height:1.4!important;
+}
+#deviceModal .modal-body > div:last-child > div:last-child{
+    width:100%!important;
+    min-width:0!important;
+    padding:11px 13px!important;
+}
+#deviceModal #v16SnmpText{
+    width:100%!important;
+}
+#deviceModal #v16SnmpText > div{
+    width:100%!important;
+}
+#deviceModal #v16SnmpText table{
+    width:100%!important;
+    min-width:0!important;
+    table-layout:fixed!important;
+}
+#deviceModal #v16SnmpText th,
+#deviceModal #v16SnmpText td{
+    padding:7px 9px!important;
+    overflow:hidden!important;
+    text-overflow:ellipsis!important;
+    white-space:nowrap!important;
+}
+#deviceModal #v16SnmpText th:first-child,
+#deviceModal #v16SnmpText td:first-child{width:25%!important}
+#deviceModal #v16SnmpText th:nth-child(2),
+#deviceModal #v16SnmpText td:nth-child(2){width:16%!important}
+#deviceModal #v16SnmpText th:nth-child(3),
+#deviceModal #v16SnmpText td:nth-child(3){width:20%!important}
+#deviceModal #v16SnmpText th:nth-child(4),
+#deviceModal #v16SnmpText td:nth-child(4),
+#deviceModal #v16SnmpText th:nth-child(5),
+#deviceModal #v16SnmpText td:nth-child(5){width:19.5%!important}
+#deviceModal #v16SnmpBtn{
+    margin-top:8px!important;
+}
+@media(max-width:700px){
+    #deviceModal .modal-body > div:last-child > div:first-child h4,
+    #deviceModal .modal-body > div:last-child > div:first-child p{
+        display:block!important;
+    }
+    #deviceModal .modal-body > div:last-child > div:first-child p{
+        margin-top:4px!important;
+    }
+}
+</style>
+
+</head>
+<body>
+<div id="nexusLaunch"><div class="launchGrid"></div><div class="launchScan"></div><i class="launchCorner tl"></i><i class="launchCorner tr"></i><i class="launchCorner bl"></i><i class="launchCorner br"></i><div class="launchCore"><div class="launchOrbit"><div class="launchLogo"></div></div><div class="launchTitle">NetScope</div><div class="launchSub">NETWORK & INFRASTRUCTURE MONITORING</div><div class="launchBox"><div class="launchRow"><span id="launchStatus">INITIALIZING NETSCOPE</span><b id="launchPercent">10%</b></div><div class="launchProgress"><span id="launchBar"></span></div></div><div class="launchFoot">OPERATIONS CONSOLE // LIVE INFRASTRUCTURE VISIBILITY</div></div></div>
+<div class="app">
+<aside class="sidebar">
+    <div class="brand">
+        <div class="brand-logo">NS</div>
+        <div class="brand-text"><h1>NetScope</h1><p>INFRASTRUCTURE MONITOR</p></div>
+    </div>
+    <div class="nav-label">Workspace</div>
+    <nav class="nav">
+        <button class="nav-btn active" data-page="overview"><span class="nav-icon">◫</span><span>Overview</span></button>
+        <button class="nav-btn" data-page="devices"><span class="nav-icon">◉</span><span>Devices</span></button>
+        <button class="nav-btn" data-page="discovery"><span class="nav-icon">⌁</span><span>Discovery</span></button>
+        <button class="nav-btn" data-page="alerts"><span class="nav-icon">△</span><span>Alerts & Events</span></button>
+        <button class="nav-btn" data-page="incidents"><span class="nav-icon">!</span><span>Incidents</span></button>
+        <button class="nav-btn" data-page="topology"><span class="nav-icon">◇</span><span>Topology</span></button>
+        <button class="nav-btn" data-page="analytics"><span class="nav-icon">⌁</span><span>Analytics</span></button>
+        <button class="nav-btn" data-page="reports"><span class="nav-icon">▤</span><span>Reports & Export</span></button>
+        <button class="nav-btn" data-page="settings"><span class="nav-icon">⚙</span><span>Alert Settings</span></button>
+    </nav>
+    <div class="sidebar-bottom">
+        <div class="monitor-state"><span class="live-dot"></span><span>Monitoring active</span></div>
+    </div>
+</aside>
+
+<main class="main">
+<header class="topbar">
+    <div class="top-title"><h2 id="topPageTitle">Operations Overview</h2><p id="lastUpdated">Connecting to monitoring engine...</p></div>
+    <div class="top-actions">
+        <div class="clock" id="clock">--:--:--</div>
+        <button class="primary-btn" onclick="goToDiscoveryAndScan()">Scan Network</button>
+    </div>
+</header>
+
+<div class="content">
+<section class="page active" id="page-overview">
+    <div class="page-head overview-head">
+        <div><h2>Infrastructure Overview</h2><p>Real-time health, performance and infrastructure status.</p></div>
+        <span class="overview-live"><i></i> LIVE MONITORING</span>
+    </div>
+
+    <div class="overview-v5-rings">
+        <div class="overview-v5-card">
+            <div class="overview-v5-ring" id="healthRing"><span id="healthValue">--%</span></div>
+            <strong id="healthText">Calculating</strong>
+            <label>Network Health</label>
+        </div>
+        <div class="overview-v5-card">
+            <div class="overview-v5-ring online-ring"><span id="onlineValue">--</span></div>
+            <strong id="totalSub">of -- monitored</strong>
+            <label>Online Devices</label>
+        </div>
+        <div class="overview-v5-card">
+            <div class="overview-v5-ring offline-ring"><span id="offlineValue">--</span></div>
+            <strong>Require attention</strong>
+            <label>Offline Devices</label>
+        </div>
+        <div class="overview-v5-card">
+            <div class="overview-v5-ring alert-ring"><span id="alertValue">--</span></div>
+            <strong>Warnings / critical</strong>
+            <label>Active Alerts</label>
+        </div>
+        <div class="overview-v5-card">
+            <div class="overview-v5-ring latency-ring"><span id="avgLatency">--</span></div>
+            <strong>Reachable devices</strong>
+            <label>Average Latency</label>
+        </div>
+    </div>
+
+    <div class="overview-v5-main">
+        <div class="panel overview-performance">
+            <div class="panel-head"><div><h3>Network Performance</h3><p>Live latency telemetry</p></div><span class="badge online">LIVE</span></div>
+            <div class="panel-body"><div class="chart-wrap"><canvas id="latencyChart"></canvas></div></div>
+        </div>
+
+        <div class="panel overview-system">
+            <div class="panel-head"><div><h3>Local System</h3><p>Host resource utilization</p></div></div>
+            <div class="panel-body">
+                <div class="overview-resource-rings">
+                    <div class="overview-resource">
+                        <div class="resource-circle cpu-circle"><span id="cpuValue">--%</span></div>
+                        <div><b>CPU</b><small id="cpuState">Normal</small></div>
+                        <div class="progress" style="display:none"><span id="cpuBar" style="width:0%"></span></div>
+                    </div>
+                    <div class="overview-resource">
+                        <div class="resource-circle ram-circle"><span id="ramValue">--%</span></div>
+                        <div><b>Memory</b><small id="ramState">Normal</small></div>
+                        <div class="progress ram" style="display:none"><span id="ramBar" style="width:0%"></span></div>
+                    </div>
+                </div>
+                <div class="overview-host">
+                    <div><span>Host</span><b id="hostName">--</b></div>
+                    <div><span>Local IP</span><b class="mono" id="hostIP">--</b></div>
+                    <div><span>Uptime</span><b id="hostUptime">--</b></div>
+                    <div><span>Health</span><b id="hostHealth">--</b></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="overview-v5-bottom">
+        <div class="panel">
+            <div class="panel-head"><div><h3>Infrastructure Snapshot</h3><p>Current monitored devices</p></div><button class="secondary-btn" onclick="showPage('devices')">View all</button></div>
+            <div class="table-wrap overview-table"><table><thead><tr><th>Device</th><th>Status</th><th>Latency</th><th>Loss</th><th>Uptime</th></tr></thead><tbody id="overviewDevices"></tbody></table></div>
+        </div>
+        <div class="panel">
+            <div class="panel-head"><div><h3>Recent Incidents</h3><p>Latest 4 monitoring events</p></div><button class="secondary-btn" onclick="showPage('alerts')">Event log</button></div>
+            <div id="overviewEvents" class="events-mini overview-events"><div class="empty">No events yet.</div></div>
+        </div>
+    </div>
+
+    <!-- Kept for existing JS compatibility -->
+    <span id="analyticsLatency" hidden></span>
+    <span id="analyticsAvailability" hidden></span>
+    <span id="analyticsLoss" hidden></span>
+</section>
+
+<section class="page" id="page-devices">
+    <div class="page-head">
+        <div><h2>Monitored Devices</h2><p>Health, availability and performance of your infrastructure.</p></div>
+        <div class="searchbar"><input id="deviceSearch" placeholder="Search device or IP..." oninput="renderDeviceCards()"></div>
+    </div>
+    <div class="device-cards" id="deviceCards"></div>
+</section>
+
+<section class="page" id="page-discovery">
+    <div class="page-head">
+        <div><h2>Network Discovery</h2><p>Discover active hosts on the local /24 network.</p></div>
+        <button id="scanButton" class="primary-btn" onclick="scanNetwork()">Start Discovery</button>
+    </div>
+    <div class="panel">
+        <div class="panel-head"><div><h3>Discovery Results</h3><p id="scanInfo">No scan performed yet</p></div></div>
+        <div id="scanStatus" class="discovery-status">Press Start Discovery to scan the local network.</div>
+        <div class="table-wrap"><table><thead><tr><th>Device</th><th>IP Address</th><th>Status</th><th>Latency</th><th>Packet Loss</th><th>Action</th></tr></thead><tbody id="scanTable"></tbody></table></div>
+    </div>
+</section>
+
+<section class="page" id="page-alerts">
+    <div class="page-head">
+        <div><h2>Alerts & Event Log</h2><p>Status transitions and infrastructure warnings.</p></div>
+        <button class="danger-btn" onclick="clearEvents()">Clear Events</button>
+    </div>
+    <div class="panel">
+        <div class="panel-head"><div><h3>Event Timeline</h3><p id="eventCount">0 events</p></div></div>
+        <div id="eventsList"><div class="empty">No events recorded.</div></div>
+    </div>
+</section>
+
+
+<section class="page" id="page-incidents">
+    <div class="page-head">
+        <div>
+            <h2>Incident Management</h2>
+            <p>Track outages from detection through service restoration.</p>
+        </div>
+        <div class="incident-toolbar">
+            <button class="secondary-btn incident-filter active" data-incident-filter="" onclick="setIncidentFilter('',this)">All</button>
+            <button class="secondary-btn incident-filter" data-incident-filter="Active" onclick="setIncidentFilter('Active',this)">Active</button>
+            <button class="secondary-btn incident-filter" data-incident-filter="Resolved" onclick="setIncidentFilter('Resolved',this)">Resolved</button>
+            <button class="primary-btn" onclick="loadIncidents()">Refresh</button>
+        </div>
+    </div>
+
+    <div class="incident-summary">
+        <div class="incident-stat"><label>Active Incidents</label><strong id="incidentActiveCount">0</strong><small>Currently affecting monitored devices</small></div>
+        <div class="incident-stat"><label>Resolved</label><strong id="incidentResolvedCount">0</strong><small>Restored services</small></div>
+        <div class="incident-stat"><label>Total Incidents</label><strong id="incidentTotalCount">0</strong><small>Recorded outage cases</small></div>
+        <div class="incident-stat"><label>Resolved Downtime</label><strong id="incidentDowntime">0m</strong><small>Total recorded downtime</small></div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-head">
+            <div><h3>Incident Timeline</h3><p>Automatic outage and recovery tracking</p></div>
+            <span class="badge online" id="incidentViewLabel">ALL INCIDENTS</span>
+        </div>
+        <div class="incident-table-wrap">
+            <table class="incident-table">
+                <thead>
+                    <tr><th>Device</th><th>Status</th><th>Severity</th><th>Started</th><th>Resolved</th><th>Duration</th></tr>
+                </thead>
+                <tbody id="incidentTableBody">
+                    <tr><td colspan="6"><div class="incident-empty">Loading incidents...</div></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<section class="page" id="page-topology">
+    <div class="page-head">
+        <div><h2>Network Topology</h2><p>Drag devices anywhere to arrange your network map.</p></div>
+        <div class="topology-legend"><span><i class="legend-dot" style="background:#22c55e"></i>Online</span><span><i class="legend-dot" style="background:#ef4444"></i>Offline</span></div>
+    </div>
+    <div class="panel">
+        <div class="panel-head"><div><h3>Live Infrastructure Map</h3><p>Drag nodes to arrange • Click to open details</p></div><span class="badge online">AUTO REFRESH</span></div>
+        <div class="topology-shell"><div class="topology-canvas" id="topologyCanvas"><svg class="topology-lines" id="topologyLines"></svg></div></div>
+    </div>
+</section>
+
+<section class="page" id="page-analytics">
+    <div class="page-head">
+        <div>
+            <h2>Performance Analytics</h2>
+            <p>Network health and historical performance at a glance.</p>
+        </div>
+        <div class="analytics-periods">
+            <button class="secondary-btn analytics-period-btn active" data-period="24h" onclick="setAnalyticsPeriod('24h',this)">24 Hours</button>
+            <button class="secondary-btn analytics-period-btn" data-period="7d" onclick="setAnalyticsPeriod('7d',this)">7 Days</button>
+            <button class="secondary-btn analytics-period-btn" data-period="30d" onclick="setAnalyticsPeriod('30d',this)">30 Days</button>
+            <button class="secondary-btn" onclick="loadAnalyticsV3()">Refresh</button>
+        </div>
+    </div>
+
+    <div class="analytics-rings">
+        <div class="analytics-ring-card">
+            <div class="analytics-ring" id="ringAvailability"><div class="analytics-ring-value" id="analyticsV2Availability">--%</div></div>
+            <label>Availability</label><small id="analyticsV2Period">Last 24 hours</small>
+        </div>
+        <div class="analytics-ring-card">
+            <div class="analytics-ring" id="ringLatency"><div class="analytics-ring-value" id="analyticsV2Latency">--</div></div>
+            <label>Avg Latency</label><small>Lower is better</small>
+        </div>
+        <div class="analytics-ring-card">
+            <div class="analytics-ring" id="ringLoss"><div class="analytics-ring-value" id="analyticsV2Loss">--%</div></div>
+            <label>Packet Loss</label><small>Network quality</small>
+        </div>
+        <div class="analytics-ring-card">
+            <div class="analytics-ring" id="ringIncidents"><div class="analytics-ring-value" id="analyticsV2Incidents">--</div></div>
+            <label>Incidents</label><small>Offline transitions</small>
+        </div>
+        <div class="analytics-ring-card">
+            <div class="analytics-ring" id="ringChecks"><div class="analytics-ring-value" id="analyticsV2Checks">--</div></div>
+            <label>Total Checks</label><small>Monitoring samples</small>
+        </div>
+    </div>
+
+    <div class="analytics-v3-grid">
+        <div class="panel analytics-v3-chart">
+            <div class="panel-head"><div><h3>Network Performance</h3><p>Average latency and packet loss by device</p></div></div>
+            <div class="panel-body"><div class="chart-wrap"><canvas id="analyticsPerformanceChart"></canvas></div></div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-head"><div><h3>Device Availability</h3><p>Observed uptime for the selected period</p></div></div>
+            <div class="analytics-device-list" id="analyticsAvailabilityList"><div class="empty">Loading...</div></div>
+        </div>
+    </div>
+
+    <div class="analytics-v3-grid">
+        <div class="panel">
+            <div class="panel-head"><div><h3>Device Performance</h3><p id="analyticsV2Subtitle">Historical performance by monitored device</p></div></div>
+            <div class="table-wrap analytics-v3-table">
+                <table>
+                    <thead><tr><th>Device</th><th>Availability</th><th>Latency</th><th>Loss</th><th>Checks</th><th>Incidents</th></tr></thead>
+                    <tbody id="analyticsV2Table"><tr><td colspan="6">Loading analytics...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-head"><div><h3>Attention Required</h3><p>Devices with the weakest recent performance</p></div></div>
+            <div class="panel-body" id="analyticsProblems"><div class="empty">Loading...</div></div>
+        </div>
+    </div>
+
+    <!-- Kept hidden so existing dashboard JavaScript remains compatible. -->
+    <div style="display:none">
+        <select id="analyticsDevice"></select>
+        <div id="historyLatencySubtitle"></div>
+        <div id="historyLossSubtitle"></div>
+        <div id="analyticsHistoryUptime"></div>
+        <div id="analyticsHistoryAvg"></div>
+        <div id="analyticsHistoryChecks"></div>
+        <table><tbody id="analyticsStatsTable"></tbody></table>
+        <canvas id="historyLatencyChart"></canvas>
+        <canvas id="historyLossChart"></canvas>
+        <canvas id="systemChart"></canvas>
+        <canvas id="uptimeChart"></canvas>
+    </div>
+</section>
+
+<section class="page" id="page-reports">
+    <div class="page-head">
+        <div><h2>Monitoring Reports</h2><p>Generate a current infrastructure snapshot and export monitoring data.</p></div>
+        <div class="report-toolbar" id="reportActions">
+            <button class="secondary-btn" onclick="refreshReport()">Refresh Report</button>
+            <button class="secondary-btn" onclick="exportDevicesCSV()">Export Devices CSV</button>
+            <button class="secondary-btn" onclick="exportEventsCSV()">Export Events CSV</button>
+            <button class="primary-btn" onclick="printMonitoringReport()">Print / Save PDF</button>
+        </div>
+    </div>
+
+    <div class="report-summary">
+        <div class="report-card"><label>Network Health</label><strong id="reportHealth">--%</strong></div>
+        <div class="report-card"><label>Online Devices</label><strong id="reportOnline">--</strong></div>
+        <div class="report-card"><label>Offline Devices</label><strong id="reportOffline">--</strong></div>
+        <div class="report-card"><label>Recorded Events</label><strong id="reportEvents">--</strong></div>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px">
+        <div class="panel-head"><div><h3>Report Information</h3><p>Current monitoring snapshot</p></div></div>
+        <div class="panel-body">
+            <div class="report-meta">
+                <div><label>Generated At</label><span id="reportGenerated">--</span></div>
+                <div><label>Monitoring Source</label><span>Local NetScope monitoring engine</span></div>
+                <div><label>Report Type</label><span>Infrastructure Status Report</span></div>
+            </div>
+            <div class="report-note">Availability values are based on observed monitoring checks stored by the application and should not be interpreted as a contractual SLA.</div>
+        </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px">
+        <div class="panel-head"><div><h3>Device Status Report</h3><p>Current state, latency, packet loss and observed uptime</p></div></div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Device</th><th>IP Address</th><th>Status</th><th>Latency</th><th>Packet Loss</th><th>Observed Uptime</th><th>Health</th></tr></thead>
+                <tbody id="reportDeviceTable"><tr><td colspan="7">Loading report...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-head"><div><h3>Recent Events</h3><p>Latest monitoring incidents included in this report</p></div></div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Date</th><th>Time</th><th>Severity</th><th>Title</th><th>Message</th></tr></thead>
+                <tbody id="reportEventTable"><tr><td colspan="5">No events loaded.</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</section>
+
+<section class="page" id="page-settings">
+    <div class="page-head">
+        <div><h2>Smart Alert Settings</h2><p>Configure when NetScope should flag infrastructure performance as warning or critical.</p></div>
+        <div class="settings-actions">
+            <button class="secondary-btn" onclick="resetThresholds()">Reset Defaults</button>
+            <button class="primary-btn" onclick="saveThresholds()">Save Settings</button>
+        </div>
+    </div>
+
+    <div class="settings-grid">
+        <div class="setting-card">
+            <div class="setting-head"><div><h3>CPU Warning Threshold</h3><p>Flags the local host when CPU utilization reaches this level.</p></div><div class="setting-value" id="cpuThresholdValue">75%</div></div>
+            <input id="cpuThreshold" type="range" min="40" max="100" step="1" value="75" oninput="previewThresholds()">
+            <div class="setting-scale"><span>40%</span><span>100%</span></div>
+        </div>
+        <div class="setting-card">
+            <div class="setting-head"><div><h3>Memory Warning Threshold</h3><p>Flags the local host when RAM utilization reaches this level.</p></div><div class="setting-value" id="ramThresholdValue">75%</div></div>
+            <input id="ramThreshold" type="range" min="40" max="100" step="1" value="75" oninput="previewThresholds()">
+            <div class="setting-scale"><span>40%</span><span>100%</span></div>
+        </div>
+        <div class="setting-card">
+            <div class="setting-head"><div><h3>Latency Warning Threshold</h3><p>Marks reachable remote devices with unusually high response time.</p></div><div class="setting-value" id="latencyThresholdValue">150 ms</div></div>
+            <input id="latencyThreshold" type="range" min="20" max="500" step="10" value="150" oninput="previewThresholds()">
+            <div class="setting-scale"><span>20 ms</span><span>500 ms</span></div>
+        </div>
+        <div class="setting-card">
+            <div class="setting-head"><div><h3>Packet Loss Warning Threshold</h3><p>Flags unstable connections when observed packet loss reaches this level.</p></div><div class="setting-value" id="lossThresholdValue">10%</div></div>
+            <input id="lossThreshold" type="range" min="1" max="100" step="1" value="10" oninput="previewThresholds()">
+            <div class="setting-scale"><span>1%</span><span>100%</span></div>
+        </div>
+    </div>
+
+    <div class="grid-equal">
+        <div class="panel">
+            <div class="panel-head"><div><h3>Alert Behavior</h3><p>Control dashboard-side smart alerts</p></div></div>
+            <div class="panel-body">
+                <div class="toggle-row"><div class="toggle-copy"><strong>Smart Threshold Alerts</strong><span>Evaluate live telemetry against your custom thresholds.</span></div><label class="switch"><input id="smartAlertsEnabled" type="checkbox" checked><span></span></label></div>
+                <div class="toggle-row"><div class="toggle-copy"><strong>Toast Notifications</strong><span>Show an on-screen warning when a threshold is crossed.</span></div><label class="switch"><input id="toastAlertsEnabled" type="checkbox" checked><span></span></label></div>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="panel-head"><div><h3>Current Thresholds</h3><p>Saved browser configuration</p></div></div>
+            <div class="panel-body">
+                <div class="threshold-status">
+                    <div class="threshold-chip"><label>CPU</label><strong id="savedCpu">75%</strong></div>
+                    <div class="threshold-chip"><label>RAM</label><strong id="savedRam">75%</strong></div>
+                    <div class="threshold-chip"><label>Latency</label><strong id="savedLatency">150 ms</strong></div>
+                    <div class="threshold-chip"><label>Packet Loss</label><strong id="savedLoss">10%</strong></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+</div>
+</main>
+</div>
+
+<div class="modal-overlay" id="deviceModal" onclick="if(event.target===this)closeDeviceDetails()">
+<div class="modal">
+    <div class="modal-head"><div><h3 id="modalDeviceName">Device Details</h3><p id="modalDeviceIP">--</p></div><button class="close" onclick="closeDeviceDetails()">&times;</button></div>
+    <div class="modal-body">
+        <div class="modal-stats">
+            <div class="modal-stat"><label>Uptime</label><strong id="statUptime">--</strong></div>
+            <div class="modal-stat"><label>Average Latency</label><strong id="statAverage">--</strong></div>
+            <div class="modal-stat"><label>Minimum Latency</label><strong id="statMinimum">--</strong></div>
+            <div class="modal-stat"><label>Maximum Latency</label><strong id="statMaximum">--</strong></div>
+            <div class="modal-stat"><label>Average Packet Loss</label><strong id="statPacketLoss">--</strong></div>
+            <div class="modal-stat"><label>Total Checks</label><strong id="statChecks">--</strong></div>
+        </div>
+        <div class="panel"><div class="panel-head"><div><h3>Recent Monitoring History</h3></div></div><div class="table-wrap"><table><thead><tr><th>Time</th><th>Status</th><th>Latency</th><th>Packet Loss</th></tr></thead><tbody id="historyTable"></tbody></table></div></div>
+    </div>
+</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+let latestData={devices:[],total:0,online:0,offline:0,system_health:0};
+let latestEvents=[];
+const maxHistory=24, timeLabels=[], cpuHistory=[], ramHistory=[], googleHistory=[], cloudflareHistory=[];
+
+Chart.defaults.color="#c0c5ca";
+Chart.defaults.borderColor="#596169";
+const commonOptions={responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{labels:{boxWidth:10,usePointStyle:true,font:{size:10}}}},scales:{x:{grid:{display:false},ticks:{font:{size:9}}},y:{beginAtZero:true,grid:{color:"#596169"},ticks:{font:{size:9}}}}};
+
+const latencyChart=new Chart(document.getElementById("latencyChart"),{type:"line",data:{labels:timeLabels,datasets:[
+{label:"Google DNS",data:googleHistory,borderColor:"#22c55e",backgroundColor:"rgba(34,197,94,.05)",tension:.35,fill:true,pointRadius:1},
+{label:"Cloudflare DNS",data:cloudflareHistory,borderColor:"#35c7c2",backgroundColor:"rgba(53,199,194,.07)",tension:.35,fill:true,pointRadius:1}
+]},options:commonOptions});
+
+const systemChart=new Chart(document.getElementById("systemChart"),{type:"line",data:{labels:timeLabels,datasets:[
+{label:"CPU %",data:cpuHistory,borderColor:"#35c7c2",tension:.35,pointRadius:1},
+{label:"RAM %",data:ramHistory,borderColor:"#a78bfa",tension:.35,pointRadius:1}
+]},options:{...commonOptions,scales:{...commonOptions.scales,y:{min:0,max:100,grid:{color:"#596169"}}}}});
+
+const uptimeChart=new Chart(document.getElementById("uptimeChart"),{type:"bar",data:{labels:[],datasets:[{label:"Uptime %",data:[],backgroundColor:"rgba(34,197,94,.45)",borderColor:"#22c55e",borderWidth:1,borderRadius:5}]},options:{...commonOptions,scales:{...commonOptions.scales,y:{min:0,max:100,grid:{color:"#596169"}}}}});
+
+const historyLatencyChart=new Chart(document.getElementById("historyLatencyChart"),{
+    type:"line",
+    data:{labels:[],datasets:[{label:"Latency (ms)",data:[],borderColor:"#35c7c2",backgroundColor:"rgba(53,199,194,.08)",fill:true,tension:.3,pointRadius:2}]},
+    options:commonOptions
+});
+const historyLossChart=new Chart(document.getElementById("historyLossChart"),{
+    type:"line",
+    data:{labels:[],datasets:[{label:"Packet Loss %",data:[],borderColor:"#f59e0b",backgroundColor:"rgba(245,158,11,.06)",fill:true,tension:.3,pointRadius:2}]},
+    options:{...commonOptions,scales:{...commonOptions.scales,y:{min:0,max:100,grid:{color:"#596169"}}}}
+});
+
+
+const pageTitles={overview:"Operations Overview",devices:"Monitored Devices",discovery:"Network Discovery",alerts:"Alerts & Events", incidents:"Incident Management",topology:"Network Topology",analytics:"Performance Analytics",reports:"Reports & Export",settings:"Smart Alert Settings"};
+document.querySelectorAll(".nav-btn").forEach(btn=>btn.addEventListener("click",()=>showPage(btn.dataset.page)));
+
+function showPage(name){
+    document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+    document.querySelectorAll(".nav-btn").forEach(b=>b.classList.toggle("active",b.dataset.page===name));
+    document.getElementById("page-"+name).classList.add("active");
+    document.getElementById("topPageTitle").textContent=pageTitles[name];
+    if(name==="incidents") setTimeout(loadIncidents,30);
+    if(name==="analytics"){setTimeout(loadAnalyticsV3,30)}
+    if(name==="overview")latencyChart.resize();
+    if(name==="topology")setTimeout(renderTopology,30);
+    if(name==="reports")refreshReport();
+}
+function goToDiscoveryAndScan(){showPage("discovery");scanNetwork()}
+function statusHTML(s){return `<span class="badge ${s==="Online"?"online":"offline"}">${s}</span>`}
+function healthHTML(h){const c=h==="Healthy"||h==="Online"?"healthy":h==="Warning"?"warning":"critical";return `<span class="${c}">${h??"--"}</span>`}
+
+function setV4Ring(id,value,max,color){
+    const el=document.getElementById(id);if(!el)return;
+    const pct=Math.max(0,Math.min(100,(Number(value||0)/Math.max(Number(max||1),1))*100));
+    el.style.setProperty("--value",pct);
+    el.style.setProperty("--ring",color||"#35c7c2");
+}
+function updateOverviewV4(data){
+    if(!document.getElementById("ovHealthRing"))return;
+    const total=Number(data.total||0), online=Number(data.online||0), offline=Number(data.offline||0);
+    const health=total?Math.round((online/total)*100):0;
+    const remote=(data.devices||[]).filter(d=>d.cpu==null && d.status==="Online");
+    const avg=remote.length?Math.round(remote.reduce((s,d)=>s+Number(d.latency||0),0)/remote.length):0;
+    const alerts=(window.latestEvents||[]).filter(e=>e.severity==="warning"||e.severity==="critical").length;
+    document.getElementById("ovHealthValue").textContent=health+"%";
+    document.getElementById("ovOnlineValue").textContent=online;
+    document.getElementById("ovOfflineValue").textContent=offline;
+    document.getElementById("ovAlertsValue").textContent=alerts;
+    document.getElementById("ovLatencyValue").textContent=avg+" ms";
+    setV4Ring("ovHealthRing",health,100,health>=95?"#22c55e":"#35c7c2");
+    setV4Ring("ovOnlineRing",online,total||1,"#22c55e");
+    setV4Ring("ovOfflineRing",offline,total||1,offline?"#ef5b67":"#22c55e");
+    setV4Ring("ovAlertsRing",alerts,Math.max(alerts,20),alerts?"#35c7c2":"#22c55e");
+    setV4Ring("ovLatencyRing",avg,250,avg<=100?"#22c55e":"#35c7c2");
+}
+function fmt(v,suffix=""){return v===null||v===undefined?"--":`${v}${suffix}`}
+function showToast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2600)}
+function escapeHTML(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+
+
+
+
+let analyticsPeriod="24h";
+let analyticsPerformanceChart=null;
+
+function setAnalyticsPeriod(period,button){
+    analyticsPeriod=period;
+    document.querySelectorAll(".analytics-period-btn").forEach(b=>b.classList.remove("active"));
+    if(button)button.classList.add("active");
+    loadAnalyticsV3();
+}
+
+function analyticsDeviceName(ip){
+    const device=(latestData.devices||[]).find(d=>d.ip===ip);
+    return device?device.name:ip;
+}
+
+function analyticsRing(id,value,maximum,color){
+    const el=document.getElementById(id);
+    if(!el)return;
+    const safe=Math.max(0,Math.min(100,(Number(value||0)/maximum)*100));
+    el.style.setProperty("--value",safe);
+    el.style.setProperty("--ring",color||"#35c7c2");
+}
+
+function availabilityColor(value){
+    const n=Number(value||0);
+    return n>=99?"#22c55e":n>=95?"#f59e0b":"#ef5b67";
+}
+
+function renderAnalyticsPerformance(devices){
+    const canvas=document.getElementById("analyticsPerformanceChart");
+    if(!canvas)return;
+    const labels=devices.map(d=>analyticsDeviceName(d.ip));
+    const latency=devices.map(d=>Number(d.average_latency||0));
+    const loss=devices.map(d=>Number(d.average_packet_loss||0));
+
+    if(analyticsPerformanceChart)analyticsPerformanceChart.destroy();
+    analyticsPerformanceChart=new Chart(canvas,{
+        type:"bar",
+        data:{
+            labels,
+            datasets:[
+                {label:"Avg Latency (ms)",data:latency,backgroundColor:"rgba(53,199,194,.72)",borderColor:"#35c7c2",borderWidth:1,borderRadius:5},
+                {label:"Packet Loss %",data:loss,backgroundColor:"rgba(148,163,184,.28)",borderColor:"#94a3b8",borderWidth:1,borderRadius:5}
+            ]
+        },
+        options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            plugins:{legend:{labels:{boxWidth:9,font:{size:9}}}},
+            scales:{
+                x:{grid:{display:false},ticks:{font:{size:8}}},
+                y:{beginAtZero:true,grid:{color:"#596169"},ticks:{font:{size:8}}}
+            }
+        }
+    });
+}
+
+async function loadAnalyticsV3(){
+    const table=document.getElementById("analyticsV2Table");
+    if(!table)return;
+    table.innerHTML=`<tr><td colspan="6">Loading analytics...</td></tr>`;
+
+    try{
+        const response=await fetch(`/api/analytics?period=${encodeURIComponent(analyticsPeriod)}`);
+        if(!response.ok)throw new Error("analytics");
+        const data=await response.json();
+        const summary=data.summary||{};
+        const devices=data.devices||[];
+        const labels={"24h":"Last 24 hours","7d":"Last 7 days","30d":"Last 30 days"};
+
+        document.getElementById("analyticsV2Availability").textContent=fmt(summary.average_availability,"%");
+        document.getElementById("analyticsV2Latency").textContent=fmt(summary.average_latency," ms");
+        document.getElementById("analyticsV2Loss").textContent=fmt(summary.average_packet_loss,"%");
+        document.getElementById("analyticsV2Checks").textContent=fmt(summary.total_checks);
+        document.getElementById("analyticsV2Incidents").textContent=fmt(summary.total_incidents);
+        document.getElementById("analyticsV2Period").textContent=labels[data.period]||data.period;
+        document.getElementById("analyticsV2Subtitle").textContent=`${devices.length} device(s) • ${labels[data.period]||data.period}`;
+
+        analyticsRing("ringAvailability",summary.average_availability,100,availabilityColor(summary.average_availability));
+        analyticsRing("ringLatency",summary.average_latency,250,Number(summary.average_latency)<=100?"#22c55e":"#35c7c2");
+        analyticsRing("ringLoss",summary.average_packet_loss,25,Number(summary.average_packet_loss)<=2?"#22c55e":Number(summary.average_packet_loss)<=10?"#f59e0b":"#ef5b67");
+        analyticsRing("ringIncidents",summary.total_incidents,20,Number(summary.total_incidents)===0?"#22c55e":"#ef5b67");
+        analyticsRing("ringChecks",summary.total_checks,Math.max(Number(summary.total_checks||1),1),"#35c7c2");
+
+        table.innerHTML=devices.map(d=>`
+            <tr>
+                <td><span class="device-name">${escapeHTML(analyticsDeviceName(d.ip))}</span><br><span class="mono">${escapeHTML(d.ip)}</span></td>
+                <td style="color:${availabilityColor(d.availability)}">${fmt(d.availability,"%")}</td>
+                <td>${fmt(d.average_latency," ms")}</td>
+                <td>${fmt(d.average_packet_loss,"%")}</td>
+                <td>${fmt(d.total_checks)}</td>
+                <td>${fmt(d.incidents)}</td>
+            </tr>`).join("")||`<tr><td colspan="6">No stored data for this period.</td></tr>`;
+
+        document.getElementById("analyticsAvailabilityList").innerHTML=devices.map(d=>`
+            <div class="analytics-device-health">
+                <div class="analytics-device-health-name">${escapeHTML(analyticsDeviceName(d.ip))}</div>
+                <div class="analytics-progress"><span style="width:${Math.max(0,Math.min(100,Number(d.availability||0)))}%;background:${availabilityColor(d.availability)}"></span></div>
+                <strong style="color:${availabilityColor(d.availability)}">${fmt(d.availability,"%")}</strong>
+            </div>`).join("")||`<div class="empty">No stored data.</div>`;
+
+        const problems=[...devices]
+            .sort((a,b)=>(Number(a.availability||0)-Number(b.availability||0))||(Number(b.incidents||0)-Number(a.incidents||0)))
+            .slice(0,4);
+
+        document.getElementById("analyticsProblems").innerHTML=problems.map(d=>`
+            <div class="analytics-problem-row">
+                <div class="analytics-problem-main">
+                    <strong>${escapeHTML(analyticsDeviceName(d.ip))}</strong>
+                    <span>${escapeHTML(d.ip)} • ${fmt(d.incidents)} incident(s)</span>
+                </div>
+                <div class="analytics-problem-score" style="color:${availabilityColor(d.availability)}">${fmt(d.availability,"%")}</div>
+            </div>`).join("")||`<div class="empty">No devices require attention.</div>`;
+
+        renderAnalyticsPerformance(devices);
+    }catch(e){
+        table.innerHTML=`<tr><td colspan="6">Analytics API could not be loaded.</td></tr>`;
+        document.getElementById("analyticsAvailabilityList").innerHTML=`<div class="empty">Unable to load availability.</div>`;
+        document.getElementById("analyticsProblems").innerHTML=`<div class="empty">Unable to load device health.</div>`;
+        showToast("Unable to load Analytics");
+    }
+}
+
+function syncAnalyticsDeviceSelector(){
+    const select=document.getElementById("analyticsDevice");
+    if(!select)return;
+    const previous=select.value;
+    select.innerHTML=(latestData.devices||[]).map(d=>`<option value="${escapeHTML(d.ip)}">${escapeHTML(d.name)} • ${escapeHTML(d.ip)}</option>`).join("");
+    if(previous && [...select.options].some(o=>o.value===previous))select.value=previous;
+}
+
+function compactHistoryTime(value){
+    if(!value)return "--";
+    const d=new Date(value);
+    if(!Number.isNaN(d.getTime()))return d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"});
+    return String(value).replace("T"," ").split(" ").pop();
+}
+
+async function loadHistoricalAnalytics(){
+    const select=document.getElementById("analyticsDevice");
+    if(!select||!select.value)return;
+    const ip=select.value;
+    const device=(latestData.devices||[]).find(d=>d.ip===ip);
+    document.getElementById("historyLatencySubtitle").textContent=`Loading ${device?device.name:ip}...`;
+    document.getElementById("historyLossSubtitle").textContent=`Loading ${device?device.name:ip}...`;
+    try{
+        const [sr,hr]=await Promise.all([
+            fetch(`/api/device/${encodeURIComponent(ip)}/statistics`),
+            fetch(`/api/device/${encodeURIComponent(ip)}/history`)
+        ]);
+        if(!sr.ok||!hr.ok)throw new Error("history");
+        const s=await sr.json(), h=await hr.json();
+        const history=h.history||[];
+        const labels=history.map(x=>compactHistoryTime(x.checked_at));
+        historyLatencyChart.data.labels=labels;
+        historyLatencyChart.data.datasets[0].data=history.map(x=>x.latency===null?null:Number(x.latency));
+        historyLossChart.data.labels=labels;
+        historyLossChart.data.datasets[0].data=history.map(x=>x.packet_loss===null?null:Number(x.packet_loss));
+        historyLatencyChart.update();historyLossChart.update();
+
+        const name=device?device.name:ip;
+        document.getElementById("historyLatencySubtitle").textContent=`${name} • ${history.length} checks`;
+        document.getElementById("historyLossSubtitle").textContent=`${name} • ${history.length} checks`;
+        document.getElementById("analyticsHistoryUptime").textContent=fmt(s.uptime_percentage,"%");
+        document.getElementById("analyticsHistoryAvg").textContent=fmt(s.average_latency," ms");
+        document.getElementById("analyticsHistoryChecks").textContent=fmt(s.total_checks);
+        document.getElementById("analyticsStatsTable").innerHTML=`<tr>
+            <td><span class="device-name">${escapeHTML(name)}</span><br><span class="mono">${escapeHTML(ip)}</span></td>
+            <td>${fmt(s.uptime_percentage,"%")}</td>
+            <td>${fmt(s.average_latency," ms")}</td>
+            <td>${fmt(s.minimum_latency," ms")}</td>
+            <td>${fmt(s.maximum_latency," ms")}</td>
+            <td>${fmt(s.average_packet_loss,"%")}</td>
+            <td>${fmt(s.total_checks)}</td>
+        </tr>`;
+    }catch(e){
+        ["analyticsHistoryUptime","analyticsHistoryAvg","analyticsHistoryChecks"].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent="--"});
+        document.getElementById("historyLatencySubtitle").textContent="Unable to load stored history";
+        document.getElementById("historyLossSubtitle").textContent="Unable to load stored history";
+        document.getElementById("analyticsStatsTable").innerHTML=`<tr><td colspan="7">Historical analytics could not be loaded.</td></tr>`;
+    }
+}
+
+function renderTopology(){
+    const canvas=document.getElementById("topologyCanvas");
+    const svg=document.getElementById("topologyLines");
+    if(!canvas||!svg)return;
+
+    canvas.querySelectorAll(".topology-node,.internet-node").forEach(n=>n.remove());
+    svg.innerHTML="";
+
+    const devices=latestData.devices||[];
+    if(!devices.length){
+        canvas.insertAdjacentHTML("beforeend",`<div class="empty">No monitored devices available.</div>`);
+        return;
+    }
+
+    const w=Math.max(canvas.clientWidth,760);
+    const h=Math.max(canvas.clientHeight,560);
+
+    // Router must be a private/local gateway — never 1.1.1.1.
+    const isPrivateGateway=d=>{
+        const ip=String(d.ip||"");
+        return /router|gateway|cpe/i.test(String(d.name||"")) ||
+               (/^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip) && ip.endsWith(".1"));
+    };
+
+    const router=devices.find(isPrivateGateway);
+    const dns=devices.filter(d=>/dns/i.test(String(d.name||""))||d.ip==="8.8.8.8"||d.ip==="1.1.1.1");
+    const lan=devices.filter(d=>d!==router&&!dns.includes(d));
+
+    const storageKey="nexus-topology-layout-v1";
+    let saved={};
+    try{saved=JSON.parse(localStorage.getItem(storageKey)||"{}")}catch(e){saved={}}
+
+    const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+    const defaults={internet:{x:w/2,y:70}};
+
+    dns.forEach((d,i)=>{
+        const gap=Math.min(210,Math.max(155,w*.18));
+        defaults["dev:"+d.ip]={x:w/2+(i-(dns.length-1)/2)*gap,y:175};
+    });
+    if(router) defaults["dev:"+router.ip]={x:w/2,y:300};
+    lan.forEach((d,i)=>{
+        const left=105,right=w-105;
+        const x=lan.length===1?w/2:left+(right-left)*(i/(lan.length-1));
+        defaults["dev:"+d.ip]={x,y:455};
+    });
+
+    const getPos=(key)=>{
+        const p=saved[key]||defaults[key]||{x:w/2,y:h/2};
+        return {x:clamp(Number(p.x)||w/2,82,w-82),y:clamp(Number(p.y)||h/2,62,h-62)};
+    };
+
+    const nodeMap=new Map();
+    const links=[];
+
+    function addLink(from,to,state){
+        links.push({from,to,state});
+    }
+
+    dns.forEach(d=>{
+        addLink("internet","dev:"+d.ip,d.status);
+        if(router)addLink("dev:"+d.ip,"dev:"+router.ip,d.status==="Online"&&router.status==="Online"?"Online":"Offline");
+    });
+    if(!dns.length&&router)addLink("internet","dev:"+router.ip,router.status);
+    if(router)lan.forEach(d=>addLink("dev:"+router.ip,"dev:"+d.ip,d.status==="Online"&&router.status==="Online"?"Online":"Offline"));
+
+    function redrawLines(){
+        svg.innerHTML="";
+        links.forEach(link=>{
+            const a=nodeMap.get(link.from),b=nodeMap.get(link.to);
+            if(!a||!b)return;
+            const ax=parseFloat(a.style.left),ay=parseFloat(a.style.top);
+            const bx=parseFloat(b.style.left),by=parseFloat(b.style.top);
+            svg.insertAdjacentHTML("beforeend",
+                `<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" class="topology-line ${link.state==="Online"?"online-line":"offline-line"}"/>`
+            );
+        });
+    }
+
+    function makeDraggable(node,key){
+        node.classList.add("draggable-node");
+        node.title="Drag to reposition";
+        let dragging=false,dx=0,dy=0;
+
+        node.addEventListener("pointerdown",e=>{
+            if(e.button!==undefined&&e.button!==0)return;
+            dragging=true;
+            node.setPointerCapture(e.pointerId);
+            const rect=canvas.getBoundingClientRect();
+            dx=e.clientX-rect.left-parseFloat(node.style.left);
+            dy=e.clientY-rect.top-parseFloat(node.style.top);
+            node.classList.add("dragging");
+            e.preventDefault();
+        });
+
+        node.addEventListener("pointermove",e=>{
+            if(!dragging)return;
+            const rect=canvas.getBoundingClientRect();
+            const x=clamp(e.clientX-rect.left-dx,82,rect.width-82);
+            const y=clamp(e.clientY-rect.top-dy,62,rect.height-62);
+            node.style.left=x+"px";
+            node.style.top=y+"px";
+            redrawLines();
+        });
+
+        const finish=e=>{
+            if(!dragging)return;
+            dragging=false;
+            node.classList.remove("dragging");
+            saved[key]={x:parseFloat(node.style.left),y:parseFloat(node.style.top)};
+            try{localStorage.setItem(storageKey,JSON.stringify(saved))}catch(err){}
+        };
+        node.addEventListener("pointerup",finish);
+        node.addEventListener("pointercancel",finish);
+    }
+
+    function appendNode(key,html,className){
+        const pos=getPos(key);
+        const node=document.createElement("div");
+        node.className=className;
+        node.style.left=pos.x+"px";
+        node.style.top=pos.y+"px";
+        node.innerHTML=html;
+        canvas.appendChild(node);
+        nodeMap.set(key,node);
+        makeDraggable(node,key);
+        return node;
+    }
+
+    appendNode("internet",
+        `<div class="node-icon">◎</div><div class="node-name">Internet</div><div class="node-ip">External Network</div><div class="node-state healthy">UPLINK</div>`,
+        "topology-node router internet-node online-node"
+    );
+
+    function addDevice(d,type){
+        const icon=type==="router"?"⌁":type==="dns"?"◆":type==="mobile"?"▯":"▣";
+        const extra=d.latency!==null&&d.latency!==undefined?`${d.latency} ms • ${d.packet_loss??0}% loss`:"No latency data";
+        const node=appendNode("dev:"+d.ip,
+            `<div class="node-icon">${icon}</div><div class="node-name">${escapeHTML(d.name)}</div><div class="node-ip">${escapeHTML(d.ip)}</div><div class="node-ip" style="margin-top:4px">${escapeHTML(extra)}</div><div class="node-state ${d.status==="Online"?"healthy":"critical"}">${escapeHTML(d.status)}</div>`,
+            `topology-node ${type==="router"?"router":""} ${d.status==="Online"?"online-node":"offline-node"}`
+        );
+        let moved=false;
+        node.addEventListener("pointermove",()=>{if(node.classList.contains("dragging"))moved=true});
+        node.addEventListener("click",()=>{if(!moved)openDeviceDetails(d.name,d.ip);moved=false});
+    }
+
+    dns.forEach(d=>addDevice(d,"dns"));
+    if(router)addDevice(router,"router");
+    lan.forEach(d=>addDevice(d,/iphone|android|phone|mobile|ipad/i.test(String(d.name))?"mobile":"device"));
+
+    redrawLines();
+
+    // Reset layout button, created once.
+    let reset=document.getElementById("resetTopologyLayout");
+    if(!reset){
+        reset=document.createElement("button");
+        reset.id="resetTopologyLayout";
+        reset.className="secondary-btn topology-reset-btn";
+        reset.type="button";
+        reset.textContent="Reset Layout";
+        reset.addEventListener("click",()=>{
+            try{localStorage.removeItem(storageKey)}catch(e){}
+            renderTopology();
+        });
+        const head=document.querySelector("#page-topology .panel-head");
+        if(head)head.appendChild(reset);
+    }
+}
+
+
+const defaultThresholds={cpu:75,ram:75,latency:150,loss:10,smart:true,toasts:true};
+let alertThresholds={...defaultThresholds};
+let smartAlertState={};
+
+function loadThresholds(){
+    try{
+        const saved=JSON.parse(localStorage.getItem("nexusAlertThresholds")||"null");
+        if(saved)alertThresholds={...defaultThresholds,...saved};
+    }catch(e){alertThresholds={...defaultThresholds}}
+    applyThresholdControls();
+}
+function applyThresholdControls(){
+    const ids={cpu:"cpuThreshold",ram:"ramThreshold",latency:"latencyThreshold",loss:"lossThreshold"};
+    Object.entries(ids).forEach(([k,id])=>{const el=document.getElementById(id);if(el)el.value=alertThresholds[k]});
+    const smart=document.getElementById("smartAlertsEnabled"),toasts=document.getElementById("toastAlertsEnabled");
+    if(smart)smart.checked=alertThresholds.smart!==false;
+    if(toasts)toasts.checked=alertThresholds.toasts!==false;
+    previewThresholds();renderSavedThresholds();
+}
+function previewThresholds(){
+    const cpu=document.getElementById("cpuThreshold"),ram=document.getElementById("ramThreshold"),
+          lat=document.getElementById("latencyThreshold"),loss=document.getElementById("lossThreshold");
+    if(cpu)document.getElementById("cpuThresholdValue").textContent=cpu.value+"%";
+    if(ram)document.getElementById("ramThresholdValue").textContent=ram.value+"%";
+    if(lat)document.getElementById("latencyThresholdValue").textContent=lat.value+" ms";
+    if(loss)document.getElementById("lossThresholdValue").textContent=loss.value+"%";
+}
+function renderSavedThresholds(){
+    const map=[["savedCpu",alertThresholds.cpu+"%"],["savedRam",alertThresholds.ram+"%"],
+               ["savedLatency",alertThresholds.latency+" ms"],["savedLoss",alertThresholds.loss+"%"]];
+    map.forEach(([id,v])=>{const el=document.getElementById(id);if(el)el.textContent=v});
+}
+function saveThresholds(){
+    alertThresholds={
+        cpu:Number(document.getElementById("cpuThreshold").value),
+        ram:Number(document.getElementById("ramThreshold").value),
+        latency:Number(document.getElementById("latencyThreshold").value),
+        loss:Number(document.getElementById("lossThreshold").value),
+        smart:document.getElementById("smartAlertsEnabled").checked,
+        toasts:document.getElementById("toastAlertsEnabled").checked
+    };
+    localStorage.setItem("nexusAlertThresholds",JSON.stringify(alertThresholds));
+    smartAlertState={};renderSavedThresholds();showToast("Alert settings saved");
+    evaluateSmartAlerts(latestData);
+}
+function resetThresholds(){
+    alertThresholds={...defaultThresholds};
+    localStorage.setItem("nexusAlertThresholds",JSON.stringify(alertThresholds));
+    smartAlertState={};applyThresholdControls();showToast("Default thresholds restored");
+}
+function thresholdToast(key,message,isAlert){
+    if(!alertThresholds.toasts)return;
+    if(smartAlertState[key]===isAlert)return;
+    smartAlertState[key]=isAlert;
+    if(isAlert)showToast(message);
+}
+function evaluateSmartAlerts(data){
+    if(!alertThresholds.smart||!data||!Array.isArray(data.devices))return;
+    const local=data.devices[0];
+    if(local){
+        const cpu=Number(local.cpu),ram=Number(local.ram);
+        if(Number.isFinite(cpu))thresholdToast("cpu",`CPU warning: ${cpu}% (threshold ${alertThresholds.cpu}%)`,cpu>=alertThresholds.cpu);
+        if(Number.isFinite(ram))thresholdToast("ram",`Memory warning: ${ram}% (threshold ${alertThresholds.ram}%)`,ram>=alertThresholds.ram);
+    }
+    data.devices.forEach(d=>{
+        if(d.status!=="Online")return;
+        const latency=Number(d.latency),loss=Number(d.packet_loss);
+        if(Number.isFinite(latency)&&latency>0)thresholdToast(`latency:${d.ip}`,`${d.name}: high latency ${latency} ms`,latency>=alertThresholds.latency);
+        if(Number.isFinite(loss))thresholdToast(`loss:${d.ip}`,`${d.name}: packet loss ${loss}%`,loss>=alertThresholds.loss);
+    });
+}
+
+function refreshReport(){
+    const d=latestData||{}, devices=d.devices||[];
+    document.getElementById("reportHealth").textContent=`${Number(d.system_health||0)}%`;
+    document.getElementById("reportOnline").textContent=d.online??0;
+    document.getElementById("reportOffline").textContent=d.offline??0;
+    document.getElementById("reportEvents").textContent=latestEvents.length;
+    document.getElementById("reportGenerated").textContent=new Date().toLocaleString();
+
+    document.getElementById("reportDeviceTable").innerHTML=devices.map(x=>`<tr>
+        <td><span class="device-name">${escapeHTML(x.name)}</span></td>
+        <td class="mono">${escapeHTML(x.ip)}</td>
+        <td>${statusHTML(x.status)}</td>
+        <td>${fmt(x.latency," ms")}</td>
+        <td>${fmt(x.packet_loss,"%")}</td>
+        <td>${fmt(x.uptime_percentage,"%")}</td>
+        <td>${healthHTML(x.health)}</td>
+    </tr>`).join("")||`<tr><td colspan="7">No monitored devices.</td></tr>`;
+
+    document.getElementById("reportEventTable").innerHTML=latestEvents.slice(0,20).map(e=>`<tr>
+        <td>${escapeHTML(e.date)}</td><td>${escapeHTML(e.time)}</td>
+        <td><span class="severity ${severityClass(e.severity)}">${escapeHTML(e.severity)}</span></td>
+        <td>${escapeHTML(e.title)}</td><td>${escapeHTML(e.message)}</td>
+    </tr>`).join("")||`<tr><td colspan="5">No recorded events.</td></tr>`;
+}
+
+function csvCell(v){
+    const s=String(v??"").replace(/"/g,'""');
+    return `"${s}"`;
+}
+function downloadCSV(filename, rows){
+    const csv="\uFEFF"+rows.map(r=>r.map(csvCell).join(",")).join("\r\n");
+    const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");a.href=url;a.download=filename;
+    document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+}
+function exportDevicesCSV(){
+    const rows=[["Device","IP Address","Status","Latency (ms)","Packet Loss (%)","Observed Uptime (%)","Health"]];
+    (latestData.devices||[]).forEach(x=>rows.push([
+        x.name,x.ip,x.status,x.latency??"",x.packet_loss??"",x.uptime_percentage??"",x.health??""
+    ]));
+    downloadCSV(`nexus_devices_${new Date().toISOString().slice(0,10)}.csv`,rows);
+    showToast("Device report exported");
+}
+function exportEventsCSV(){
+    const rows=[["Date","Time","Severity","Title","Message"]];
+    latestEvents.forEach(e=>rows.push([e.date,e.time,e.severity,e.title,e.message]));
+    downloadCSV(`nexus_events_${new Date().toISOString().slice(0,10)}.csv`,rows);
+    showToast("Event log exported");
+}
+function printMonitoringReport(){
+    refreshReport();
+    window.print();
+}
+
+function renderOverview(){
+    const d=latestData, health=Number(d.system_health||0);
+    document.getElementById("healthValue").textContent=health+"%";
+    document.getElementById("healthText").textContent=health>=90?"Operational":health>=70?"Degraded":"Attention Required";
+    document.getElementById("healthRing").style.background=`conic-gradient(${health>=90?"#22c55e":health>=70?"#f59e0b":"#ef4444"} 0deg ${health*3.6}deg,#596169 ${health*3.6}deg 360deg)`;
+    document.getElementById("onlineValue").textContent=d.online;
+    document.getElementById("offlineValue").textContent=d.offline;
+    document.getElementById("totalSub").textContent=`of ${d.total} monitored`;
+    const remote=d.devices.filter(x=>x.latency!==null&&x.latency!==undefined&&x.latency>0);
+    const avg=remote.length?Math.round(remote.reduce((a,x)=>a+Number(x.latency),0)/remote.length):0;
+    document.getElementById("avgLatency").textContent=remote.length?avg+" ms":"--";
+    document.getElementById("analyticsLatency").textContent=remote.length?avg+" ms":"--";
+    document.getElementById("analyticsAvailability").textContent=health+"%";
+    const lossVals=d.devices.map(x=>Number(x.packet_loss)).filter(Number.isFinite);
+    const loss=lossVals.length?(lossVals.reduce((a,b)=>a+b,0)/lossVals.length).toFixed(1):0;
+    document.getElementById("analyticsLoss").textContent=loss+"%";
+    const local=d.devices[0];
+    if(local){
+        const cpu=Number(local.cpu||0),ram=Number(local.ram||0);
+        document.getElementById("cpuValue").textContent=cpu+"%";document.getElementById("ramValue").textContent=ram+"%";
+        const cpuCircle=document.querySelector(".cpu-circle"),ramCircle=document.querySelector(".ram-circle");
+        if(cpuCircle){cpuCircle.style.borderColor=cpu>=90?"#ef5968":cpu>=75?"#f59e0b":"#22c55e"}
+        if(ramCircle){ramCircle.style.borderColor=ram>=90?"#ef5968":ram>=75?"#f59e0b":"#8b9299"}
+        document.getElementById("cpuBar").style.width=Math.min(cpu,100)+"%";document.getElementById("ramBar").style.width=Math.min(ram,100)+"%";
+        document.getElementById("cpuState").textContent=cpu>=90?"Critical":cpu>=75?"High":"Normal";
+        document.getElementById("ramState").textContent=ram>=90?"Critical":ram>=75?"High":"Normal";
+        document.getElementById("hostName").textContent=local.name;document.getElementById("hostIP").textContent=local.ip;
+        document.getElementById("hostUptime").textContent=local.uptime;document.getElementById("hostHealth").innerHTML=healthHTML(local.health);
+    }
+    document.getElementById("overviewDevices").innerHTML=d.devices.slice(0,5).map(x=>`<tr><td><span class="device-name">${escapeHTML(x.name)}</span><br><span class="mono">${escapeHTML(x.ip)}</span></td><td>${statusHTML(x.status)}</td><td>${fmt(x.latency," ms")}</td><td>${fmt(x.packet_loss,"%")}</td><td>${fmt(x.uptime_percentage,"%")}</td></tr>`).join("")||`<tr><td colspan="5">No devices.</td></tr>`;
+    uptimeChart.data.labels=d.devices.map(x=>x.name);uptimeChart.data.datasets[0].data=d.devices.map(x=>Number(x.uptime_percentage||0));uptimeChart.update();
+}
+
+function renderDeviceCards(){
+    const q=(document.getElementById("deviceSearch").value||"").toLowerCase();
+    const devices=latestData.devices.filter(x=>x.name.toLowerCase().includes(q)||x.ip.toLowerCase().includes(q));
+    document.getElementById("deviceCards").innerHTML=devices.map(x=>`
+    <div class="device-card">
+        <div class="device-card-head"><div><h3>${escapeHTML(x.name)}</h3><div class="ipline">${escapeHTML(x.ip)}</div></div>${statusHTML(x.status)}</div>
+        <div class="device-stats">
+            <div class="mini-stat"><label>Latency</label><strong>${fmt(x.latency," ms")}</strong></div>
+            <div class="mini-stat"><label>Packet Loss</label><strong>${fmt(x.packet_loss,"%")}</strong></div>
+            <div class="mini-stat"><label>Uptime</label><strong>${fmt(x.uptime_percentage,"%")}</strong></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
+            <span style="font-size:10px">${healthHTML(x.health)}</span>
+            <div class="actions"><button class="small-btn" onclick='openDeviceDetails(${JSON.stringify(x.name)},${JSON.stringify(x.ip)})'>Details</button>${x.removable?`<button class="danger-btn" style="padding:6px 9px" onclick='removeDevice(${JSON.stringify(x.ip)})'>Remove</button>`:""}</div>
+        </div>
+    </div>`).join("")||`<div class="empty">No matching devices.</div>`;
+}
+
+function updateHistory(data){
+    if(!data.devices.length)return;
+    const local=data.devices[0],g=data.devices.find(x=>x.name==="Google DNS"),c=data.devices.find(x=>x.name==="Cloudflare DNS");
+    timeLabels.push(data.timestamp);cpuHistory.push(local.cpu);ramHistory.push(local.ram);
+    googleHistory.push(g?.latency??null);cloudflareHistory.push(c?.latency??null);
+    if(timeLabels.length>maxHistory){timeLabels.shift();cpuHistory.shift();ramHistory.shift();googleHistory.shift();cloudflareHistory.shift()}
+    latencyChart.update();systemChart.update();
+}
+
+async function updateDashboard(){
+    try{
+        const r=await fetch("/api/status"); if(!r.ok)throw new Error("status");
+        latestData=await r.json();
+        document.getElementById("lastUpdated").textContent="Last update • "+latestData.timestamp;
+        renderOverview();renderDeviceCards();renderTopology();syncAnalyticsDeviceSelector();updateHistory(latestData);evaluateSmartAlerts(latestData);if(document.getElementById("page-reports").classList.contains("active"))refreshReport();
+    }catch(e){document.getElementById("lastUpdated").textContent="Live monitoring • local engine"}
+}
+
+function severityClass(s){return s==="critical"?"sev-critical":s==="warning"?"sev-warning":s==="success"?"sev-success":"sev-info"}
+function eventRows(events,limit){
+    const arr=limit?events.slice(0,limit):events;
+    if(!arr.length)return `<div class="empty">No events recorded.</div>`;
+    return arr.map(e=>`<div class="event-row"><span class="severity ${severityClass(e.severity)}">${escapeHTML(e.severity)}</span><span class="event-title">${escapeHTML(e.title)}</span><span class="event-message">${escapeHTML(e.message)}</span><span class="event-time">${escapeHTML(e.date)} ${escapeHTML(e.time)}</span></div>`).join("");
+}
+async function updateEvents(){
+    try{
+        const r=await fetch("/api/events");if(!r.ok)throw new Error("events");const d=await r.json();latestEvents=d.events||[];
+        document.getElementById("eventCount").textContent=`${d.count} event${d.count===1?"":"s"}`;
+        document.getElementById("eventsList").innerHTML=eventRows(latestEvents);
+        document.getElementById("overviewEvents").innerHTML=eventRows(latestEvents,4);
+        const active=latestEvents.filter(e=>e.severity==="critical"||e.severity==="warning").length;
+        document.getElementById("alertValue").textContent=active;if(document.getElementById("page-reports").classList.contains("active"))refreshReport();
+    }catch(e){}
+}
+async function clearEvents(){
+    if(!confirm("Clear all recorded events?"))return;
+    try{const r=await fetch("/api/events/clear",{method:"POST"});const d=await r.json();showToast(d.message||"Events cleared");if(r.ok)updateEvents()}catch(e){showToast("Unable to clear events")}
+}
+
+async function scanNetwork(){
+    const b=document.getElementById("scanButton"),info=document.getElementById("scanInfo"),status=document.getElementById("scanStatus");
+    b.disabled=true;b.textContent="Scanning...";info.textContent="Scanning local /24 network...";status.textContent="Discovery in progress. This can take a few seconds.";
+    try{
+        const r=await fetch("/api/scan");const d=await r.json();info.textContent=`${d.count} device(s) found • ${d.network}`;status.textContent=`Scan completed at ${d.timestamp}.`;
+        document.getElementById("scanTable").innerHTML=(d.devices||[]).map(x=>{
+            const monitored=x.monitored||latestData.devices.some(m=>m.ip===x.ip);
+            return `<tr><td class="device-name">${escapeHTML(x.name)}</td><td class="mono">${escapeHTML(x.ip)}</td><td>${statusHTML(x.status)}</td><td>${fmt(x.latency," ms")}</td><td>${fmt(x.packet_loss,"%")}</td><td>${monitored?`<button class="secondary-btn" disabled>Already Monitored</button>`:`<button class="small-btn" onclick='addDevice(${JSON.stringify(x.name)},${JSON.stringify(x.ip)},this)'>Add Device</button>`}</td></tr>`
+        }).join("")||`<tr><td colspan="6">No active devices discovered.</td></tr>`;
+    }catch(e){status.textContent="Network scan failed.";info.textContent="Discovery error"}finally{b.disabled=false;b.textContent="Start Discovery"}
+}
+async function addDevice(name,ip,button){
+    button.disabled=true;button.textContent="Adding...";
+    try{const r=await fetch("/api/add-device",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,ip})});const d=await r.json();showToast(d.message);if(r.ok){button.textContent="Added";await updateDashboard()}else button.textContent="Already Monitored"}catch(e){button.disabled=false;button.textContent="Try Again"}
+}
+async function removeDevice(ip){
+    if(!confirm("Remove this device from monitoring?"))return;
+    try{const r=await fetch("/api/remove-device",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ip})});const d=await r.json();showToast(d.message);if(r.ok){await updateDashboard();await updateEvents()}}catch(e){showToast("Unable to remove device")}
+}
+
+async function openDeviceDetails(name,ip){
+    document.getElementById("modalDeviceName").textContent=name;document.getElementById("modalDeviceIP").textContent=ip;document.getElementById("deviceModal").classList.add("show");
+    ["statUptime","statAverage","statMinimum","statMaximum","statPacketLoss","statChecks"].forEach(id=>document.getElementById(id).textContent="--");
+    document.getElementById("historyTable").innerHTML=`<tr><td colspan="4">Loading...</td></tr>`;
+    try{
+        const [sr,hr]=await Promise.all([fetch(`/api/device/${encodeURIComponent(ip)}/statistics`),fetch(`/api/device/${encodeURIComponent(ip)}/history`)]);
+        const s=await sr.json(),h=await hr.json();
+        document.getElementById("statUptime").textContent=fmt(s.uptime_percentage,"%");document.getElementById("statAverage").textContent=fmt(s.average_latency," ms");
+        document.getElementById("statMinimum").textContent=fmt(s.minimum_latency," ms");document.getElementById("statMaximum").textContent=fmt(s.maximum_latency," ms");
+        document.getElementById("statPacketLoss").textContent=fmt(s.average_packet_loss,"%");document.getElementById("statChecks").textContent=fmt(s.total_checks);
+        const hist=(h.history||[]).slice().reverse();
+        document.getElementById("historyTable").innerHTML=hist.map(x=>`<tr><td class="mono">${escapeHTML(x.checked_at)}</td><td>${statusHTML(x.status)}</td><td>${fmt(x.latency," ms")}</td><td>${fmt(x.packet_loss,"%")}</td></tr>`).join("")||`<tr><td colspan="4">No monitoring history yet.</td></tr>`;
+    }catch(e){document.getElementById("historyTable").innerHTML=`<tr><td colspan="4">Unable to load statistics.</td></tr>`}
+}
+function closeDeviceDetails(){document.getElementById("deviceModal").classList.remove("show")}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDeviceDetails()});
+
+function applyLightChartTheme(){
+    Chart.defaults.color="#64748b";
+    Chart.defaults.borderColor="#e2e8f0";
+    [latencyChart,systemChart,uptimeChart,historyLatencyChart,historyLossChart].forEach(chart=>{
+        if(!chart)return;
+        if(chart.options.scales?.x){
+            chart.options.scales.x.grid={display:false};
+            chart.options.scales.x.ticks={...(chart.options.scales.x.ticks||{}),color:"#64748b"};
+        }
+        if(chart.options.scales?.y){
+            chart.options.scales.y.grid={...(chart.options.scales.y.grid||{}),color:"#e5ebf2"};
+            chart.options.scales.y.ticks={...(chart.options.scales.y.ticks||{}),color:"#64748b"};
+        }
+        if(chart.options.plugins?.legend?.labels) chart.options.plugins.legend.labels.color="#64748b";
+        chart.update();
+    });
+}
+
+function updateClock(){document.getElementById("clock").textContent=new Date().toLocaleTimeString("en-GB",{hour12:false})}
+applyLightChartTheme();updateClock();setInterval(updateClock,1000);
+updateDashboard();updateEvents();
+setInterval(()=>{updateDashboard();updateEvents()},5000);
+
+let incidentFilter = "";
+
+function formatIncidentDuration(seconds){
+    seconds = Number(seconds || 0);
+    if(seconds < 60) return seconds + "s";
+    const minutes = Math.floor(seconds / 60);
+    if(minutes < 60) return minutes + "m";
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    if(hours < 24) return hours + "h " + remainingMinutes + "m";
+    const days = Math.floor(hours / 24);
+    return days + "d " + (hours % 24) + "h";
+}
+
+function formatIncidentDate(value){
+    if(!value) return "—";
+
+    const raw = String(value).trim();
+    const match = raw.match(
+        /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/
+    );
+
+    if(!match) return raw.replace("T"," ");
+
+    const months = [
+        "Jan","Feb","Mar","Apr","May","Jun",
+        "Jul","Aug","Sep","Oct","Nov","Dec"
+    ];
+
+    const year = match[1];
+    const month = months[Number(match[2]) - 1];
+    const day = match[3];
+    const hour = match[4];
+    const minute = match[5];
+    const second = match[6] || "00";
+
+    return `${day} ${month} ${year} • ${hour}:${minute}:${second}`;
+}
+
+function escapeIncidentHtml(value){
+    return String(value ?? "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+}
+
+function setIncidentFilter(value, button){
+    incidentFilter = value;
+    document.querySelectorAll(".incident-filter").forEach(btn=>btn.classList.remove("active"));
+    if(button) button.classList.add("active");
+    loadIncidents();
+}
+
+async function loadIncidents(){
+    const body = document.getElementById("incidentTableBody");
+    if(!body) return;
+
+    try{
+        const query = incidentFilter ? "?status=" + encodeURIComponent(incidentFilter) : "";
+        const response = await fetch("/api/incidents" + query);
+        if(!response.ok) throw new Error("Incident API unavailable");
+        const data = await response.json();
+        const summary = data.summary || {};
+
+        document.getElementById("incidentActiveCount").textContent = summary.active_incidents || 0;
+        document.getElementById("incidentResolvedCount").textContent = summary.resolved_incidents || 0;
+        document.getElementById("incidentTotalCount").textContent = summary.total_incidents || 0;
+        document.getElementById("incidentDowntime").textContent =
+            formatIncidentDuration(summary.resolved_downtime_seconds || 0);
+
+        const label = document.getElementById("incidentViewLabel");
+        if(label) label.textContent = (incidentFilter || "All") + " Incidents";
+
+        const incidents = data.incidents || [];
+        if(!incidents.length){
+            body.innerHTML = '<tr><td colspan="6"><div class="incident-empty">No ' +
+                escapeIncidentHtml((incidentFilter || "").toLowerCase()) +
+                ' incidents recorded yet.</div></td></tr>';
+            return;
+        }
+
+        body.innerHTML = incidents.map(item=>{
+            const active = item.status === "Active";
+            return `
+                <tr>
+                    <td class="incident-device">
+                        <strong>${escapeIncidentHtml(item.device_name || "Network Device")}</strong>
+                        <span>${escapeIncidentHtml(item.device_ip || "—")}</span>
+                    </td>
+                    <td><span class="incident-status ${active ? "incident-active" : "incident-resolved"}">${escapeIncidentHtml(item.status)}</span></td>
+                    <td><span class="incident-severity">${escapeIncidentHtml(item.severity || "Critical")}</span></td>
+                    <td>${escapeIncidentHtml(formatIncidentDate(item.started_at))}</td>
+                    <td>${active ? "—" : escapeIncidentHtml(formatIncidentDate(item.resolved_at))}</td>
+                    <td class="mono">${escapeIncidentHtml(formatIncidentDuration(item.duration_seconds))}</td>
+                </tr>`;
+        }).join("");
+    }catch(error){
+        body.innerHTML = '<tr><td colspan="6"><div class="incident-empty">Unable to load Incident Management API.</div></td></tr>';
+    }
+}
+
+</script>
+<script>
+(function(){
+ const o=document.getElementById("nexusLaunch"),s=document.getElementById("launchStatus"),p=document.getElementById("launchPercent"),b=document.getElementById("launchBar");
+ const q=[[150,10,"INITIALIZING NETSCOPE"],[650,29,"LOADING NETWORK TELEMETRY"],[1150,48,"DISCOVERING INFRASTRUCTURE"],[1650,68,"SYNCING INCIDENT HISTORY"],[2200,87,"PREPARING OPERATIONS CONSOLE"],[2750,100,"SYSTEM READY"]];
+ q.forEach(x=>setTimeout(()=>{s.textContent=x[2];p.textContent=x[1]+"%";b.style.width=x[1]+"%"},x[0]));
+ setTimeout(()=>o.classList.add("exit"),3300);setTimeout(()=>o.remove(),4200);
+})();
+</script>
+
+<script id="netscope-v12-health-ring">
+(function(){
+ function syncOverviewHealthRing(){
+   const card=document.querySelector("#page-overview .overview-v5-card:first-child");
+   if(!card) return;
+   const ring=card.querySelector(".overview-v5-ring");
+   const value=ring && ring.querySelector("span");
+   if(!ring || !value) return;
+   const n=parseFloat(value.textContent);
+   if(Number.isFinite(n)){
+      const pct=Math.max(0,Math.min(100,n));
+      ring.style.setProperty("--health-angle",(pct*3.6)+"deg");
+   }
+ }
+ syncOverviewHealthRing();
+ setInterval(syncOverviewHealthRing,1000);
+})();
+</script>
+
+
+<script id="netscope-v13-kpi-sync">
+(function(){
+ function numberFrom(el){
+   if(!el) return 0;
+   const n=parseFloat(String(el.textContent).replace(/[^\d.]/g,""));
+   return Number.isFinite(n)?n:0;
+ }
+ function syncNetScopeKpis(){
+   const cards=[...document.querySelectorAll("#page-overview .overview-v5-card")];
+   if(cards.length<5) return;
+   const rings=cards.map(c=>c.querySelector(".overview-v5-ring"));
+   const vals=cards.map(c=>numberFrom(c.querySelector(".overview-v5-ring span")));
+   const online=vals[1], offline=vals[2], total=Math.max(online+offline,1);
+   if(rings[0]) rings[0].style.setProperty("--health-angle",Math.max(0,Math.min(360,vals[0]*3.6))+"deg");
+   if(rings[1]) rings[1].style.setProperty("--online-angle",(online/total*360)+"deg");
+   if(rings[2]) rings[2].style.setProperty("--offline-angle",(offline/total*360)+"deg");
+   if(rings[3]) rings[3].style.setProperty("--alert-angle",Math.min(360,vals[3]*7.2)+"deg");
+   if(rings[4]) rings[4].style.setProperty("--latency-angle",Math.min(360,vals[4]/200*360)+"deg");
+ }
+ syncNetScopeKpis();
+ setInterval(syncNetScopeKpis,1000);
+})();
+</script>
+
+
+<script id="netscope-v13-1-chart-fix">
+(function(){
+ function resizeNetScopeCharts(){
+   try{
+     if(typeof Chart==="undefined") return;
+     const canvas=document.querySelector("#page-overview .overview-performance canvas");
+     if(!canvas) return;
+     const chart=Chart.getChart ? Chart.getChart(canvas) : null;
+     if(chart){
+       chart.resize();
+       chart.update("none");
+     }
+   }catch(e){}
+ }
+ window.addEventListener("load",()=>setTimeout(resizeNetScopeCharts,250));
+ window.addEventListener("resize",()=>setTimeout(resizeNetScopeCharts,120));
+ document.addEventListener("click",e=>{
+   if(e.target.closest('[data-page="overview"]')) setTimeout(resizeNetScopeCharts,180);
+ });
+ setTimeout(resizeNetScopeCharts,700);
+ setTimeout(resizeNetScopeCharts,1600);
+})();
+</script>
+
+
+
+
+
+<script id="netscope-v14-1-devices-js">
+(function(){
+ function num(v){
+   const n=parseFloat(String(v||"").replace(/[^\d.]/g,""));
+   return Number.isFinite(n)?n:null;
+ }
+ function page(){
+   return document.getElementById("page-devices");
+ }
+ function cards(){
+   const p=page();
+   return p ? [...p.querySelectorAll(".device-card")] : [];
+ }
+ function ensure(){
+   const p=page();
+   if(!p || document.getElementById("deviceV14Summary")) return;
+   const first=cards()[0];
+   if(!first) return;
+
+   const container=first.parentElement;
+   const box=document.createElement("div");
+   box.id="deviceV14Summary";
+   box.innerHTML=`
+    <div class="device-v14-stat">
+      <div class="device-v14-icon">#</div>
+      <div class="device-v14-copy"><strong id="dv14Total">0</strong><span>Total Devices</span></div>
+    </div>
+    <div class="device-v14-stat online">
+      <div class="device-v14-icon">●</div>
+      <div class="device-v14-copy"><strong id="dv14Online">0</strong><span>Online Devices</span></div>
+    </div>
+    <div class="device-v14-stat offline">
+      <div class="device-v14-icon">!</div>
+      <div class="device-v14-copy"><strong id="dv14Offline">0</strong><span>Offline Devices</span></div>
+    </div>
+    <div class="device-v14-stat">
+      <div class="device-v14-icon">ms</div>
+      <div class="device-v14-copy"><strong id="dv14Latency">--</strong><span>Average Latency</span></div>
+    </div>`;
+   container.parentNode.insertBefore(box,container);
+ }
+ function update(){
+   ensure();
+   const list=cards();
+   if(!list.length) return;
+   let on=0,off=0,lats=[];
+   list.forEach(card=>{
+     const status=(card.querySelector(".status")?.textContent||"").trim().toLowerCase();
+     if(status.includes("offline")) off++;
+     else if(status.includes("online")) on++;
+
+     const stat=[...card.querySelectorAll(".mini-stat")].find(el =>
+       (el.querySelector("span")?.textContent||"").toLowerCase().includes("latency")
+     );
+     const latency=num(stat?.querySelector("strong")?.textContent);
+     if(latency!==null && status.includes("online")) lats.push(latency);
+   });
+   const avg=lats.length ? lats.reduce((a,b)=>a+b,0)/lats.length : null;
+   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v};
+   set("dv14Total",list.length);
+   set("dv14Online",on);
+   set("dv14Offline",off);
+   set("dv14Latency",avg===null?"--":avg.toFixed(1)+" ms");
+ }
+ function boot(){
+   update();
+   setTimeout(update,250);
+   setTimeout(update,900);
+ }
+ if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",boot);
+ else boot();
+
+ document.addEventListener("click",e=>{
+   if(e.target.closest('[data-page="devices"]')) setTimeout(update,120);
+ });
+ setInterval(update,1500);
+})();
+</script>
+
+
+<script id="netscope-v14-2-summary-fix">
+(function(){
+ function page(){ return document.getElementById("page-devices"); }
+ function cards(){ return page() ? [...page().querySelectorAll(".device-card")] : []; }
+ function num(v){
+   const n=parseFloat(String(v||"").replace(/[^\d.]/g,""));
+   return Number.isFinite(n)?n:null;
+ }
+ function set(id,v){ const el=document.getElementById(id); if(el) el.textContent=v; }
+
+ function cardState(card){
+   const text=(card.innerText||"").toLowerCase();
+   const offlineEl=card.querySelector(".offline,[class*='offline']");
+   const onlineEl=card.querySelector(".online,[class*='online']");
+   if(offlineEl || /\boffline\b/.test(text)) return "offline";
+   if(onlineEl || /\bonline\b/.test(text) || /\bhealthy\b/.test(text)) return "online";
+   return "unknown";
+ }
+
+ function cardLatency(card){
+   for(const stat of card.querySelectorAll(".mini-stat")){
+     const label=(stat.querySelector("span")?.textContent||"").trim().toLowerCase();
+     if(label.includes("latency")){
+       return num(stat.querySelector("strong")?.textContent);
+     }
+   }
+   return null;
+ }
+
+ function updateV142(){
+   const all=cards();
+   if(!all.length) return;
+
+   let online=0, offline=0, latency=[];
+   for(const card of all){
+     const state=cardState(card);
+     if(state==="online") online++;
+     else if(state==="offline") offline++;
+
+     if(state==="online"){
+       const ms=cardLatency(card);
+       if(ms!==null) latency.push(ms);
+     }
+   }
+
+   const avg=latency.length ? latency.reduce((a,b)=>a+b,0)/latency.length : null;
+   set("dv14Total", all.length);
+   set("dv14Online", online);
+   set("dv14Offline", offline);
+   set("dv14Latency", avg===null ? "--" : avg.toFixed(1)+" ms");
+ }
+
+ document.addEventListener("DOMContentLoaded",()=>{
+   setTimeout(updateV142,150);
+   setTimeout(updateV142,800);
+ });
+ setInterval(updateV142,1000);
+})();
+</script>
+
+
+<script id="netscope-v15-notification-js">
+(function(){
+ const KEY="netscope-notifications-read-v1";
+ let seen={};
+ try{seen=JSON.parse(localStorage.getItem(KEY)||"{}")}catch(e){seen={}}
+
+ function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+ function eventId(e){return String(e.id ?? [e.timestamp,e.time,e.title,e.message,e.type].join("|"))}
+ function severity(e){
+   const s=String(e.severity||e.type||"info").toLowerCase();
+   if(s.includes("critical")||s.includes("offline")) return "critical";
+   if(s.includes("warning")||s.includes("high")) return "warning";
+   if(s.includes("success")||s.includes("recover")||s.includes("online")) return "success";
+   return "info";
+ }
+ function title(e){
+   return e.title||e.event_type||e.name||e.type||"Monitoring Event";
+ }
+ function message(e){
+   return e.message||e.description||e.details||"Infrastructure status update.";
+ }
+ function time(e){
+   const v=e.timestamp||e.created_at||e.time||"";
+   if(!v)return "";
+   const d=new Date(v);
+   if(Number.isNaN(d.getTime()))return String(v).slice(0,16).replace("T"," ");
+   return d.toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"});
+ }
+ function install(){
+   if(document.getElementById("nsNotifyWrap"))return;
+   const top=document.querySelector(".topbar");
+   if(!top)return;
+   const right=top.lastElementChild;
+   if(!right)return;
+   const wrap=document.createElement("div");
+   wrap.className="ns-notify-wrap";wrap.id="nsNotifyWrap";
+   wrap.innerHTML=`
+    <button class="ns-notify-btn" id="nsNotifyBtn" title="Notifications" aria-label="Notifications">♢
+      <span class="ns-notify-badge" id="nsNotifyBadge">0</span>
+    </button>
+    <div class="ns-notify-panel" id="nsNotifyPanel">
+      <div class="ns-notify-head">
+        <div><strong>Notification Center</strong><br><span>Infrastructure activity</span></div>
+        <div class="ns-notify-actions">
+          <button class="ns-notify-action" id="nsMarkRead">Mark all read</button>
+          <button class="ns-notify-action" id="nsRefreshNotify">Refresh</button>
+        </div>
+      </div>
+      <div class="ns-notify-list" id="nsNotifyList"><div class="ns-notify-empty">Loading notifications…</div></div>
+      <div class="ns-notify-foot">NetScope live monitoring</div>
+    </div>`;
+   right.insertBefore(wrap,right.firstChild);
+
+   document.getElementById("nsNotifyBtn").onclick=e=>{
+     e.stopPropagation();document.getElementById("nsNotifyPanel").classList.toggle("open");
+   };
+   document.getElementById("nsRefreshNotify").onclick=e=>{e.stopPropagation();load()};
+   document.getElementById("nsMarkRead").onclick=e=>{
+     e.stopPropagation();
+     document.querySelectorAll(".ns-notify-item").forEach(el=>seen[el.dataset.id]=true);
+     localStorage.setItem(KEY,JSON.stringify(seen));renderBadge();load();
+   };
+   document.addEventListener("click",e=>{
+     const p=document.getElementById("nsNotifyPanel");
+     if(p && !wrap.contains(e.target))p.classList.remove("open");
+   });
+ }
+ let current=[];
+ function renderBadge(){
+   const badge=document.getElementById("nsNotifyBadge");if(!badge)return;
+   const unread=current.filter(e=>!seen[eventId(e)]).length;
+   badge.textContent=unread>99?"99+":unread;
+   badge.classList.toggle("show",unread>0);
+ }
+ function render(){
+   const list=document.getElementById("nsNotifyList");if(!list)return;
+   if(!current.length){list.innerHTML='<div class="ns-notify-empty">No recent notifications</div>';renderBadge();return}
+   list.innerHTML=current.slice(0,12).map(e=>{
+     const id=eventId(e),unread=!seen[id],sev=severity(e);
+     return `<div class="ns-notify-item ${sev} ${unread?"unread":""}" data-id="${esc(id)}">
+       <span class="ns-notify-dot"></span>
+       <div class="ns-notify-copy"><strong>${esc(title(e))}</strong><p>${esc(message(e))}</p></div>
+       <span class="ns-notify-time">${esc(time(e))}</span>
+     </div>`;
+   }).join("");
+   list.querySelectorAll(".ns-notify-item").forEach(el=>el.onclick=()=>{
+     seen[el.dataset.id]=true;localStorage.setItem(KEY,JSON.stringify(seen));
+     el.classList.remove("unread");renderBadge();
+   });
+   renderBadge();
+ }
+ async function load(){
+   try{
+     const r=await fetch("/api/events");
+     const data=await r.json();
+     current=Array.isArray(data)?data:(data.events||[]);
+     current=current.slice(0,20);
+     render();
+   }catch(e){
+     const list=document.getElementById("nsNotifyList");
+     if(list)list.innerHTML='<div class="ns-notify-empty">Notification feed unavailable</div>';
+   }
+ }
+ install();load();setInterval(load,10000);
+})();
+</script>
+
+
+<script id="netscope-v16-features-js">
+(function(){
+ const fmtBytes=n=>{n=Number(n||0);const u=["B","KB","MB","GB","TB"];let i=0;while(n>=1024&&i<u.length-1){n/=1024;i++}return n.toFixed(i?1:0)+" "+u[i]};
+ let trafficChart=null,lastTraffic=null;
+ function installTrafficPage(){
+   const nav=document.querySelector('.nav-btn[data-page="analytics"]');
+   if(nav && !document.querySelector('.nav-btn[data-page="traffic"]')){
+     const b=document.createElement('button');b.className='nav-btn';b.dataset.page='traffic';b.innerHTML='<span class="nav-icon">↕</span><span>Network Traffic</span>';nav.parentNode.insertBefore(b,nav);
+     b.addEventListener('click',()=>{document.querySelectorAll('.nav-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));document.getElementById('page-traffic').classList.add('active');const t=document.querySelector('.top-title h2');if(t)t.textContent='Network Traffic';});
+   }
+   const content=document.querySelector('.content'); if(!content||document.getElementById('page-traffic'))return;
+   const s=document.createElement('section');s.className='page';s.id='page-traffic';s.innerHTML=`<div class="page-head"><div><h2>Network Traffic</h2><p>Live host network throughput and interface counters.</p></div></div><div class="ns-v16-traffic"><div class="ns-v16-metric"><label>Download Rate</label><strong id="v16Down">--</strong></div><div class="ns-v16-metric"><label>Upload Rate</label><strong id="v16Up">--</strong></div><div class="ns-v16-metric"><label>Total Received</label><strong id="v16Recv">--</strong></div><div class="ns-v16-metric"><label>Total Sent</label><strong id="v16Sent">--</strong></div></div><div class="ns-v16-chart"><canvas id="v16TrafficChart"></canvas></div>`;content.appendChild(s);
+   if(window.Chart){trafficChart=new Chart(document.getElementById('v16TrafficChart'),{type:'line',data:{labels:[],datasets:[{label:'Download',data:[],borderColor:'#35d0c5',backgroundColor:'rgba(53,208,197,.08)',fill:true,tension:.35,pointRadius:0},{label:'Upload',data:[],borderColor:'#3d8cff',backgroundColor:'rgba(61,140,255,.05)',fill:true,tension:.35,pointRadius:0}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{labels:{color:'#8ea7b8'}}},scales:{x:{grid:{display:false},ticks:{color:'#668195'}},y:{beginAtZero:true,grid:{color:'#1a394d'},ticks:{color:'#668195',callback:v=>fmtBytes(v)+'/s'}}}}});}
+ }
+ async function traffic(){
+   try{const r=await fetch('/api/traffic');if(r.status===401)return;const d=await r.json();document.getElementById('v16Recv').textContent=fmtBytes(d.bytes_recv);document.getElementById('v16Sent').textContent=fmtBytes(d.bytes_sent);if(lastTraffic){const now=Date.now(),sec=Math.max((now-lastTraffic.t)/1000,.2),down=Math.max(0,(d.bytes_recv-lastTraffic.r)/sec),up=Math.max(0,(d.bytes_sent-lastTraffic.s)/sec);document.getElementById('v16Down').textContent=fmtBytes(down)+'/s';document.getElementById('v16Up').textContent=fmtBytes(up)+'/s';if(trafficChart){trafficChart.data.labels.push(new Date().toLocaleTimeString('en-GB',{hour12:false}));trafficChart.data.datasets[0].data.push(down);trafficChart.data.datasets[1].data.push(up);if(trafficChart.data.labels.length>30){trafficChart.data.labels.shift();trafficChart.data.datasets.forEach(x=>x.data.shift())}trafficChart.update('none')}}lastTraffic={r:d.bytes_recv,s:d.bytes_sent,t:Date.now()}}catch(e){}
+ }
+ function enhanceDeviceModal(){
+   const body=document.querySelector('#deviceModal .modal-body');if(!body||document.getElementById('v16DeviceExtra'))return;
+   const x=document.createElement('div');x.id='v16DeviceExtra';x.className='ns-v16-device-extra';x.innerHTML=`<div class="ns-v16-box"><h4>Device Intelligence</h4><p id="v16DeviceInsight">Open a device to view live status, historical performance and availability.</p></div><div class="ns-v16-box"><h4>SNMP</h4><p id="v16SnmpText">Optional SNMP telemetry for compatible routers and switches.</p><button class="small-btn ns-v16-snmp-btn" id="v16SnmpBtn">Query SNMP</button></div>`;body.appendChild(x);
+   document.getElementById('v16SnmpBtn').onclick=async()=>{
+     const ip=document.getElementById('modalDeviceIP').textContent.trim();
+     const p=document.getElementById('v16SnmpText');
+     const btn=document.getElementById('v16SnmpBtn');
+     p.textContent='Querying SNMP…';
+     btn.disabled=true;
+     try{
+       const [systemResponse,interfacesResponse]=await Promise.all([
+         fetch('/api/snmp/'+encodeURIComponent(ip)),
+         fetch('/api/snmp/'+encodeURIComponent(ip)+'/interfaces')
+       ]);
+       const d=await systemResponse.json();
+       const ifaceData=await interfacesResponse.json();
+
+       let html=d.success
+         ? `<span style="color:#91d3ae;font-weight:700">Connected</span><br><strong>System Name:</strong> ${escapeHTML(d.name||'Not provided')}<br><strong>Version:</strong> ${escapeHTML(d.version||'SNMP')}<br><strong>System Uptime:</strong> ${escapeHTML(d.uptime||'--')}<br><strong>Description:</strong> ${escapeHTML(d.description||'Not provided')}`
+         : `<span style="color:#aeb4ba;font-weight:700">Not Available</span><br>${escapeHTML(d.message||'No SNMP response from this device.')}`;
+
+       if(ifaceData.success && Array.isArray(ifaceData.interfaces) && ifaceData.interfaces.length){
+         const fmtTraffic=value=>{
+           const n=Number(value||0);
+           if(n>=1073741824)return (n/1073741824).toFixed(2)+' GB';
+           if(n>=1048576)return (n/1048576).toFixed(2)+' MB';
+           if(n>=1024)return (n/1024).toFixed(2)+' KB';
+           return n+' B';
+         };
+         const fmtSpeed=value=>{
+           const n=Number(value||0);
+           if(n>=1000000000)return (n/1000000000).toFixed(n%1000000000?1:0)+' Gbps';
+           if(n>=1000000)return (n/1000000).toFixed(n%1000000?1:0)+' Mbps';
+           if(n>=1000)return (n/1000).toFixed(n%1000?1:0)+' Kbps';
+           return n+' bps';
+         };
+         const rows=ifaceData.interfaces.map(x=>{
+           const up=String(x.oper_status||'').toLowerCase()==='up';
+           return `<tr>
+             <td>${escapeHTML(x.name||('Interface '+x.index))}</td>
+             <td><span style="color:${up?'#91d3ae':'#f1a2aa'};font-weight:700">${escapeHTML(x.oper_status||'Unknown')}</span></td>
+             <td>${escapeHTML(fmtSpeed(x.speed_bps))}</td>
+             <td>${escapeHTML(fmtTraffic(x.in_octets))}</td>
+             <td>${escapeHTML(fmtTraffic(x.out_octets))}</td>
+           </tr>`;
+         }).join('');
+         html+=`<div style="margin-top:14px;padding-top:12px;border-top:1px solid #28465b">
+           <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px">
+             <strong>Interfaces</strong>
+             <span style="font-size:9px;color:#8ea7b8">${ifaceData.interface_count} detected</span>
+           </div>
+           <div style="overflow-x:auto">
+             <table style="min-width:520px;width:100%">
+               <thead><tr><th>Interface</th><th>Status</th><th>Speed</th><th>RX</th><th>TX</th></tr></thead>
+               <tbody>${rows}</tbody>
+             </table>
+           </div>
+         </div>`;
+       }else if(d.success){
+         html+=`<div style="margin-top:12px;padding-top:10px;border-top:1px solid #28465b;color:#aeb4ba"><strong>Interfaces:</strong> ${escapeHTML(ifaceData.message||'No IF-MIB interface data available.')}</div>`;
+       }
+       p.innerHTML=html;
+     }catch(e){
+       p.textContent='Unable to query SNMP.';
+     }finally{
+       btn.disabled=false;
+     }
+   };
+ }
+ const oldOpen=window.openDeviceDetails;
+ if(typeof oldOpen==='function'){window.openDeviceDetails=async function(name,ip){await oldOpen(name,ip);enhanceDeviceModal();const p=document.getElementById('v16DeviceInsight');if(p)p.textContent=`${name} (${ip}) • Historical availability, latency, packet loss and monitoring checks are shown above.`}}
+ function addLogout(){const top=document.querySelector('.topbar');const right=top&&top.lastElementChild;if(!right||document.getElementById('v16Logout'))return;const a=document.createElement('a');a.id='v16Logout';a.href='/logout';a.className='secondary-btn ns-v16-auth';a.textContent='Logout';right.appendChild(a)}
+ installTrafficPage();enhanceDeviceModal();addLogout();traffic();setInterval(traffic,3000);
+})();
+</script>
+</body>
+</html>
